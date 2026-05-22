@@ -6,13 +6,12 @@
 'use strict';
 
 const memwatch = require('memwatch-next');
-const sinon = require('sinon');
 const Todo = require('./fixtures/todo');
 
 describe('mongodb', function() {
+  let leakCount = 0;
   before(function() {
-    this.spy = sinon.spy();
-    memwatch.on('leak', this.spy);
+    memwatch.on('leak', () => { leakCount++; });
   });
 
   after(function(done) {
@@ -20,7 +19,7 @@ describe('mongodb', function() {
   });
 
   function resetTestState(ctx, cb) {
-    ctx.spy.reset();
+    leakCount = 0;
     ctx.iterations = 0;
     Todo.destroyAll(cb);
   }
@@ -32,8 +31,8 @@ describe('mongodb', function() {
       hasOptions = false;
     }
     const interval = setInterval(function() {
-      if (ctx.iterations >= global.ITERATIONS || ctx.spy.called) {
-        ctx.spy.called.should.be.False();
+      if (ctx.iterations >= global.ITERATIONS || leakCount > 0) {
+        (leakCount === 0).should.be.True();
         clearInterval(interval);
         return done();
       }

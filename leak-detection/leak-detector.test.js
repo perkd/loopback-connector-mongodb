@@ -12,12 +12,10 @@ try {
 } catch (e) {
   memwatch = require('memwatch-next');
 }
-const sinon = require('sinon');
-
 describe('leak detector', function() {
+  let leakCount = 0;
   before(function() {
-    this.spy = sinon.spy();
-    memwatch.on('leak', this.spy);
+    memwatch.on('leak', () => { leakCount++; });
   });
 
   it('should detect a basic leak', function(done) {
@@ -25,8 +23,8 @@ describe('leak detector', function() {
     const iterations = 0;
     const leaks = [];
     const interval = setInterval(function() {
-      if (test.iterations >= global.ITERATIONS || test.spy.called) {
-        test.spy.called.should.be.True();
+      if (test.iterations >= global.ITERATIONS || leakCount > 0) {
+        (leakCount > 0).should.be.True();
         clearInterval(interval);
         return done();
       }

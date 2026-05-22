@@ -31,7 +31,6 @@ function __CONTAIN_FN__(actual, expected) {
   assert.ok(contains(a, e), 'Expected ' + JSON.stringify(a) + ' to contain ' + JSON.stringify(e));
 }
 
-const sinon = require('sinon');
 const sanitizeFilter = require('../lib/mongodb').sanitizeFilter;
 const trimLeadingDollarSigns = require('../lib/mongodb').trimLeadingDollarSigns;
 
@@ -3561,11 +3560,14 @@ describe('mongodb connector', function() {
       });
 
       describe('using flags', function() {
-        beforeEach(function addSpy() {
-          sinon.stub(console, 'error');
+        let consoleErrorCalls = 0;
+        const originalConsoleError = console.error;
+        beforeEach(function() {
+          consoleErrorCalls = 0;
+          console.error = () => { consoleErrorCalls++; };
         });
-        afterEach(function removeSpy() {
-          console.error.restore();
+        afterEach(function() {
+          console.error = originalConsoleError;
         });
 
         it('should work', () => new Promise((resolve, reject) => {
@@ -3585,7 +3587,7 @@ describe('mongodb connector', function() {
             err,
             posts,
           ) {
-            assert.ok(console.error.calledOnce);
+            assert.strictEqual(consoleErrorCalls, 1);
             resolve();
           });
         }));
@@ -3608,11 +3610,14 @@ describe('mongodb connector', function() {
       });
 
       describe('using flags', function() {
-        beforeEach(function addSpy() {
-          sinon.stub(console, 'error');
+        let consoleErrorCalls = 0;
+        const originalConsoleError = console.error;
+        beforeEach(function() {
+          consoleErrorCalls = 0;
+          console.error = () => { consoleErrorCalls++; };
         });
-        afterEach(function removeSpy() {
-          console.error.restore();
+        afterEach(function() {
+          console.error = originalConsoleError;
         });
 
         it('should work', () => new Promise((resolve, reject) => {
@@ -3632,7 +3637,7 @@ describe('mongodb connector', function() {
             err,
             posts,
           ) {
-            assert.ok(console.error.calledOnce);
+            assert.strictEqual(consoleErrorCalls, 1);
             resolve();
           });
         }));
@@ -3655,11 +3660,14 @@ describe('mongodb connector', function() {
       });
 
       describe('using flags', function() {
-        beforeEach(function addSpy() {
-          sinon.stub(console, 'error');
+        let consoleErrorCalls = 0;
+        const originalConsoleError = console.error;
+        beforeEach(function() {
+          consoleErrorCalls = 0;
+          console.error = () => { consoleErrorCalls++; };
         });
-        afterEach(function removeSpy() {
-          console.error.restore();
+        afterEach(function() {
+          console.error = originalConsoleError;
         });
 
         it('should work', () => new Promise((resolve, reject) => {
@@ -3678,7 +3686,7 @@ describe('mongodb connector', function() {
           Post.find(
             {where: {content: {regexp: new RegExp(/^a/g)}}},
             function(err, posts) {
-              assert.ok(console.error.calledOnce);
+              assert.strictEqual(consoleErrorCalls, 1);
               resolve();
             },
           );
