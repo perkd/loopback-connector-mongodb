@@ -6,13 +6,16 @@
 'use strict';
 
 require('./init.js');
-const promisify = require('bluebird').promisify;
+
+const {describe, it, before, beforeEach, after, afterEach} = require('node:test');
+const assert = require('node:assert/strict');
+const {promisify} = require('node:util');
 const Decimal128 = require('mongodb').Decimal128;
 
 let db, OrderDecimal;
 
 describe('model with decimal property', function() {
-  before(function(done) {
+  before(() => new Promise((resolve, reject) => {
     db = global.getDataSource();
     const propertyDef = {
       count: {
@@ -24,30 +27,34 @@ describe('model with decimal property', function() {
     };
 
     OrderDecimal = db.createModel('OrderDecimal', propertyDef);
-    OrderDecimal.destroyAll(done);
-  });
+    OrderDecimal.destroyAll((err) => err ? reject(err) : resolve());
+  }));
 
-  it('create - coerces strings to decimal 128', function(done) {
+  it('create - coerces strings to decimal 128', () => new Promise((resolve, reject) => {
     OrderDecimal.create({count: '0.0005'}, function(err, order) {
-      if (err) return done(err);
-      // FIXME Ideally the returned data should have a decimal `count`
-      // not a string. While juggler generates the returned data, connector
-      // doesn't have any control.
-      order.count.should.equal('0.0005');
-      done();
+      if (err) return reject(err);
+      try {
+        // FIXME Ideally the returned data should have a decimal `count`
+        // not a string. While juggler generates the returned data, connector
+        // doesn't have any control.
+        assert.strictEqual(order.count, '0.0005');
+        resolve();
+      } catch (e) { reject(e); }
     });
-  });
+  }));
 
-  it('find - filters decimal property', function(done) {
+  it('find - filters decimal property', () => new Promise((resolve, reject) => {
     OrderDecimal.find({where: {count: '0.0005'}}, function(err, orders) {
-      if (err) return done(err);
-      orders.length.should.be.above(0);
-      const o = orders[0];
-      o.count.should.deepEqual(Decimal128.fromString('0.0005'));
-      o.count.should.be.an.instanceOf(Decimal128);
-      done();
+      if (err) return reject(err);
+      try {
+        assert.ok(orders.length > 0);
+        const o = orders[0];
+        assert.deepStrictEqual(o.count, Decimal128.fromString('0.0005'));
+        assert.ok(o.count instanceof Decimal128);
+        resolve();
+      } catch (e) { reject(e); }
     });
-  });
+  }));
 
   it('destroyAll - deletes all with where', function() {
     return OrderDecimal.create({count: '0.0006'})
@@ -58,8 +65,8 @@ describe('model with decimal property', function() {
         return OrderDecimal.find();
       })
       .then(function(r) {
-        r.length.should.equal(1);
-        r[0].count.should.deepEqual(Decimal128.fromString('0.0006'));
+        assert.strictEqual(r.length, 1);
+        assert.deepStrictEqual(r[0].count, Decimal128.fromString('0.0006'));
       });
   });
 
@@ -91,21 +98,21 @@ describe('model with decimal property', function() {
     return decimalAndNumberModel.create(createData)
       .then(function(createdInstance) {
         instanceId = createdInstance.id;
-        createdInstance.objProp.numProp.should.eql(1);
-        createdInstance.objProp.should.not.have.keys('decimalProp');
+        assert.deepStrictEqual(createdInstance.objProp.numProp, 1);
+        assert.strictEqual(createdInstance.objProp.decimalProp, undefined);
         return decimalAndNumberModel.updateAll({id: instanceId}, updateData);
       })
       .then(function() {
         return decimalAndNumberModel.findById(instanceId);
       })
       .then(function(updatedInstance) {
-        updatedInstance.objProp.numProp.should.eql(2);
-        updatedInstance.objProp.should.not.have.keys('decimalProp');
+        assert.deepStrictEqual(updatedInstance.objProp.numProp, 2);
+        assert.strictEqual(updatedInstance.objProp.decimalProp, undefined);
       });
   });
 
-  context('nested decimal props', function() {
-    context('should create/update instance', function() {
+  describe('nested decimal props', function() {
+    describe('should create/update instance', function() {
       it('for array of decimal props', function() {
         const modelWithDecimalArray = db.define('modelWithDecimalArray', {
           randomReview: {
@@ -140,16 +147,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('modelWithDecimalArray', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.randomReview[0].should.be.instanceOf(Decimal128);
-            createdInstance.randomReview[0].should.deepEqual(Decimal128.fromString('3.5'));
+            assert.ok(createdInstance.randomReview[0] instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.randomReview[0], Decimal128.fromString('3.5'));
             return modelWithDecimalArray.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('modelWithDecimalArray', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.randomReview[0].should.be.instanceOf(Decimal128);
-            updatedInstance.randomReview[0].should.deepEqual(Decimal128.fromString('5.5'));
+            assert.ok(updatedInstance.randomReview[0] instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.randomReview[0], Decimal128.fromString('5.5'));
           });
       });
       it('for nested decimal prop inside array', function() {
@@ -210,16 +217,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('modelWithDecimalNestedArray', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.tickets[0].unitprice.should.be.instanceOf(Decimal128);
-            createdInstance.tickets[0].unitprice.should.deepEqual(Decimal128.fromString('19.5'));
+            assert.ok(createdInstance.tickets[0].unitprice instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.tickets[0].unitprice, Decimal128.fromString('19.5'));
             return modelWithDecimalNestedArray.updateAll({id: instanceId}, updateData);
           })
           .then(function(inst) {
             return findRawModelDataAsync('modelWithDecimalNestedArray', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.tickets[0].unitprice.should.be.instanceOf(Decimal128);
-            updatedInstance.tickets[0].unitprice.should.deepEqual(Decimal128.fromString('27.5'));
+            assert.ok(updatedInstance.tickets[0].unitprice instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.tickets[0].unitprice, Decimal128.fromString('27.5'));
           });
       });
 
@@ -266,16 +273,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('modelWithDecimalNestedObject', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.awards.prizeMoney.should.be.instanceOf(Decimal128);
-            createdInstance.awards.prizeMoney.should.deepEqual(Decimal128.fromString('10000.00'));
+            assert.ok(createdInstance.awards.prizeMoney instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.awards.prizeMoney, Decimal128.fromString('10000.00'));
             return modelWithDecimalNestedObject.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('modelWithDecimalNestedObject', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.awards.prizeMoney.should.be.instanceOf(Decimal128);
-            updatedInstance.awards.prizeMoney.should.deepEqual(Decimal128.fromString('25000.00'));
+            assert.ok(updatedInstance.awards.prizeMoney instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.awards.prizeMoney, Decimal128.fromString('25000.00'));
           });
       });
       it('for decimal prop within 2D array', function() {
@@ -312,16 +319,22 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('arrayWithinArrayModel', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.arrayProp[0].nestedArray[0].decimalProp.should.be.instanceOf(Decimal128);
-            createdInstance.arrayProp[0].nestedArray[0].decimalProp.should.deepEqual(Decimal128.fromString('1.1'));
+            assert.ok(createdInstance.arrayProp[0].nestedArray[0].decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(
+              createdInstance.arrayProp[0].nestedArray[0].decimalProp,
+              Decimal128.fromString('1.1'),
+            );
             return arrayWithinArrayModel.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('arrayWithinArrayModel', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.arrayProp[0].nestedArray[0].decimalProp.should.be.instanceOf(Decimal128);
-            updatedInstance.arrayProp[0].nestedArray[0].decimalProp.should.deepEqual(Decimal128.fromString('3.3'));
+            assert.ok(updatedInstance.arrayProp[0].nestedArray[0].decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(
+              updatedInstance.arrayProp[0].nestedArray[0].decimalProp,
+              Decimal128.fromString('3.3'),
+            );
           });
       });
       it('for decimal prop in object within array', function() {
@@ -360,16 +373,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('objectWithinArrayModel', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.arrayProp[0].nestedObject.decimalProp.should.be.instanceOf(Decimal128);
-            createdInstance.arrayProp[0].nestedObject.decimalProp.should.deepEqual(Decimal128.fromString('1.1'));
+            assert.ok(createdInstance.arrayProp[0].nestedObject.decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.arrayProp[0].nestedObject.decimalProp, Decimal128.fromString('1.1'));
             return objectWithinArrayModel.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('objectWithinArrayModel', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.arrayProp[0].nestedObject.decimalProp.should.be.instanceOf(Decimal128);
-            updatedInstance.arrayProp[0].nestedObject.decimalProp.should.deepEqual(Decimal128.fromString('3.3'));
+            assert.ok(updatedInstance.arrayProp[0].nestedObject.decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.arrayProp[0].nestedObject.decimalProp, Decimal128.fromString('3.3'));
           });
       });
       it('for decimal prop in array within object', function() {
@@ -404,16 +417,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('arrayWithinObjectModel', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.objProp.nestedArray[0].decimalProp.should.be.instanceOf(Decimal128);
-            createdInstance.objProp.nestedArray[0].decimalProp.should.deepEqual(Decimal128.fromString('1.1'));
+            assert.ok(createdInstance.objProp.nestedArray[0].decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.objProp.nestedArray[0].decimalProp, Decimal128.fromString('1.1'));
             return arrayWithinObjectModel.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('arrayWithinObjectModel', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.objProp.nestedArray[0].decimalProp.should.be.instanceOf(Decimal128);
-            updatedInstance.objProp.nestedArray[0].decimalProp.should.deepEqual(Decimal128.fromString('3.3'));
+            assert.ok(updatedInstance.objProp.nestedArray[0].decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.objProp.nestedArray[0].decimalProp, Decimal128.fromString('3.3'));
           });
       });
 
@@ -451,16 +464,16 @@ describe('model with decimal property', function() {
             return findRawModelDataAsync('nestedObjectModel', instanceId);
           })
           .then(function(createdInstance) {
-            createdInstance.objProp.nestedObject.decimalProp.should.be.instanceOf(Decimal128);
-            createdInstance.objProp.nestedObject.decimalProp.should.deepEqual(Decimal128.fromString('1.1'));
+            assert.ok(createdInstance.objProp.nestedObject.decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(createdInstance.objProp.nestedObject.decimalProp, Decimal128.fromString('1.1'));
             return nestedObjectModel.updateAll({id: instanceId}, updateData);
           })
           .then(function() {
             return findRawModelDataAsync('nestedObjectModel', instanceId);
           })
           .then(function(updatedInstance) {
-            updatedInstance.objProp.nestedObject.decimalProp.should.be.instanceOf(Decimal128);
-            updatedInstance.objProp.nestedObject.decimalProp.should.deepEqual(Decimal128.fromString('3.3'));
+            assert.ok(updatedInstance.objProp.nestedObject.decimalProp instanceof Decimal128);
+            assert.deepStrictEqual(updatedInstance.objProp.nestedObject.decimalProp, Decimal128.fromString('3.3'));
           });
       });
     });

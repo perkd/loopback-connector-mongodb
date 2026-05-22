@@ -5,37 +5,41 @@
 
 'use strict';
 
-// This test written in mocha+should.js
-const should = require('./init.js');
+const {describe, it, before, beforeEach} = require('node:test');
+const assert = require('node:assert/strict');
+
+require('./init.js');
 
 describe('connector function - findById', function() {
   let db, TestAlias, sampleId;
-  before(function(done) {
+  before(() => new Promise((resolve, reject) => {
     db = global.getDataSource();
     TestAlias = db.define('TestAlias', {foo: {type: String}});
     db.automigrate(function(err) {
-      if (err) return done(err);
+      if (err) return reject(err);
       TestAlias.create({foo: 'foo'}, function(err, t) {
-        if (err) return done(err);
+        if (err) return reject(err);
         sampleId = t.id;
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('find is aliased as findById', function(done) {
+  it('find is aliased as findById', () => new Promise((resolve, reject) => {
     db.connector.findById('TestAlias', sampleId, {}, function(err, r) {
-      if (err) return done(err);
-      r.foo.should.equal('foo');
-      done();
+      if (err) return reject(err);
+      try {
+        assert.strictEqual(r.foo, 'foo');
+        resolve();
+      } catch (e) { reject(e); }
     });
-  });
+  }));
 });
 
 describe('find (implicitNullType)', function() {
   let db, TestAlias, sampleId;
   let implicitNullType = false;
-  beforeEach(function(done) {
+  beforeEach(() => new Promise((resolve, reject) => {
     db = global.getDataSource({
       host: '127.0.0.1',
       port: global.config.port,
@@ -44,30 +48,32 @@ describe('find (implicitNullType)', function() {
     implicitNullType = !implicitNullType;
     TestAlias = db.define('TestAlias', {foo: {type: String}});
     db.automigrate(function(err) {
-      if (err) return done(err);
+      if (err) return reject(err);
       TestAlias.create({foo: 'foo'}, function(err, t) {
-        if (err) return done(err);
+        if (err) return reject(err);
         sampleId = t.id;
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('find none by id: sampleId, deletedAt: null (implicitNullType=false)', function(done) {
+  it('find none by id: sampleId, deletedAt: null (implicitNullType=false)', () => new Promise((resolve, reject) => {
     db.connector.all('TestAlias', {where: {id: sampleId, deletedAt: null}}, {}, function(err, r) {
-      if (err) return done(err);
+      if (err) return reject(err);
       if (r.length) {
-        return done(new Error('all should not have found the TestAlias document'));
+        return reject(new Error('all should not have found the TestAlias document'));
       }
-      done();
+      resolve();
     });
-  });
+  }));
 
-  it('find all by id: sampleId, deletedAt: null (implicitNullType=true)', function(done) {
+  it('find all by id: sampleId, deletedAt: null (implicitNullType=true)', () => new Promise((resolve, reject) => {
     db.connector.all('TestAlias', {where: {id: sampleId, deletedAt: null}}, {}, function(err, r) {
-      if (err) return done(err);
-      r[0].foo.should.equal('foo');
-      done();
+      if (err) return reject(err);
+      try {
+        assert.strictEqual(r[0].foo, 'foo');
+        resolve();
+      } catch (e) { reject(e); }
     });
-  });
+  }));
 });

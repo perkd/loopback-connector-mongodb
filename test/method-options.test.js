@@ -5,7 +5,8 @@
 
 'use strict';
 
-const {expectation} = require('sinon');
+const {describe, it, before} = require('node:test');
+const assert = require('node:assert/strict');
 
 require('./init.js');
 
@@ -28,7 +29,7 @@ describe('method level options', function() {
         'player.number': 2};
       await Game.update(playerData);
       const lastGame = await Game.findOne({_id: player.id});
-      lastGame.playerInfo.should.be.eql({
+      assert.deepStrictEqual(lastGame.playerInfo, {
         'player.lives': 2,
         'player.number': 2});
     });

@@ -7,11 +7,14 @@
 
 require('./init.js');
 
+const {describe, it, before, beforeEach, after, afterEach} = require('node:test');
+const assert = require('node:assert/strict');
+const {promisify} = require('node:util');
+
 let Book, Chapter;
 const ds = global.getDataSource();
 const objectIDLikeString = '7cd2ad46ffc580ba45d3cb1f';
 const objectIDLikeString2 = '7cd2ad46ffc580ba45d3cb1e';
-const promisify = require('bluebird').promisify;
 
 describe('ObjectID', function() {
   before(function() {
@@ -21,45 +24,47 @@ describe('ObjectID', function() {
     Chapter.belongsTo('book');
   });
 
-  it('should cast foreign keys as ObjectID', function(done) {
+  it('should cast foreign keys as ObjectID', () => new Promise((resolve, reject) => {
     Chapter.beforeCreate = function(next, data) {
-      data.bookId.should.be.an.instanceOf(ds.ObjectID);
-      this.bookId.should.be.an.instanceOf(ds.ObjectID);
-      next();
+      try {
+        assert.ok(data.bookId instanceof ds.ObjectID);
+        assert.ok(this.bookId instanceof ds.ObjectID);
+        next();
+      } catch (e) { next(e); }
     };
 
     Book.create(function(err, book) {
-      if (err) return done(err);
-      Chapter.create({bookId: book.id.toString()}, done);
+      if (err) return reject(err);
+      Chapter.create({bookId: book.id.toString()}, (err) => err ? reject(err) : resolve());
     });
-  });
+  }));
 
   it('should convert 24 byte hex string as ObjectID', function() {
     const ObjectID = ds.connector.getDefaultIdType();
     const str = objectIDLikeString;
-    ObjectID(str).should.be.an.instanceOf(ds.ObjectID);
+    assert.ok(ObjectID(str) instanceof ds.ObjectID);
   });
 
   it('should not convert 12 byte string as ObjectID', function() {
     const ObjectID = ds.connector.getDefaultIdType();
     const str = 'line-by-line';
-    ObjectID(str).should.be.equal(str);
+    assert.strictEqual(ObjectID(str), str);
   });
 
   it('should keep mongodb ObjectID as is', function() {
     const ObjectID = ds.connector.getDefaultIdType();
     const id = new ds.ObjectID();
-    ObjectID(id).should.be.an.instanceOf(ds.ObjectID);
+    assert.ok(ObjectID(id) instanceof ds.ObjectID);
   });
 
   it('should keep non-string id as it', function() {
     const ObjectID = ds.connector.getDefaultIdType();
     const id = 123;
-    ObjectID(id).should.be.equal(123);
+    assert.strictEqual(ObjectID(id), 123);
   });
 
-  context('strictObjectIDCoercion', function() {
-    context('when set to false (default)', function() {
+  describe('strictObjectIDCoercion', function() {
+    describe('when set to false (default)', function() {
       const Article = ds.createModel(
         'ArticleA',
         {
@@ -68,18 +73,18 @@ describe('ObjectID', function() {
         },
       );
 
-      beforeEach(function(done) {
-        Article.deleteAll(done);
-      });
+      beforeEach(() => new Promise((resolve, reject) => {
+        Article.deleteAll((err) => err ? reject(err) : resolve());
+      }));
 
       it('should save as ObjectID', async function() {
         await Article.create({xid: objectIDLikeString, title: 'abc'});
         const found = await Article.findOne({where: {title: 'abc'}});
-        found.xid.should.be.an.instanceOf(ds.ObjectID);
+        assert.ok(found.xid instanceof ds.ObjectID);
       });
     });
 
-    context('when set to true', function() {
+    describe('when set to true', function() {
       const Article = ds.createModel(
         'ArticleB',
         {
@@ -89,19 +94,19 @@ describe('ObjectID', function() {
         {strictObjectIDCoercion: true},
       );
 
-      beforeEach(function(done) {
-        Article.deleteAll(done);
-      });
+      beforeEach(() => new Promise((resolve, reject) => {
+        Article.deleteAll((err) => err ? reject(err) : resolve());
+      }));
 
       it('should not save as ObjectID', async function() {
         await Article.create({xid: objectIDLikeString, title: 'abc'});
         const found = await Article.findOne({where: {title: 'abc'}});
-        found.xid.should.not.be.an.instanceOf(ds.ObjectID);
+        assert.ok(!(found.xid instanceof ds.ObjectID));
       });
     });
   });
 
-  context("mongodb: {dataType: 'objectid'}", function() {
+  describe("mongodb: {dataType: 'objectid'}", function() {
     const Article = ds.createModel(
       'ArticleC',
       {
@@ -112,22 +117,22 @@ describe('ObjectID', function() {
       {strictObjectIDCoercion: true},
     );
 
-    beforeEach(function(done) {
-      Article.deleteAll(done);
-    });
+    beforeEach(() => new Promise((resolve, reject) => {
+      Article.deleteAll((err) => err ? reject(err) : resolve());
+    }));
 
     it('should throw if value is not an ObjectID-like string', async function() {
       try {
         await Article.create({xid: '', title: 'abc'});
       } catch (e) {
-        e.message.should.match(/not an ObjectID string/);
+        assert.match(String(e.message), /not an ObjectID string/);
       }
     });
 
     it('should save as ObjectID regardless of strictObjectIDCoercion: true', async function() {
       await Article.create({xid: objectIDLikeString, title: 'abc'});
       const found = await Article.findOne({where: {title: 'abc'}});
-      found.xid.should.be.an.instanceOf(ds.ObjectID);
+      assert.ok(found.xid instanceof ds.ObjectID);
     });
 
     it('should properly save an array of ObjectIDs', async () => {
@@ -138,14 +143,11 @@ describe('ObjectID', function() {
       });
       const found = await Article.find({where: {title: 'arrayOfObjectID'}});
       // the type of the returned array is actually string even though they are stored as ObjectIds in the db
-      found[0].xidArr.should.containDeep([
-        objectIDLikeString,
-        objectIDLikeString2,
-      ]);
+      for (const v of [objectIDLikeString, objectIDLikeString2]) assert.ok(found[0].xidArr.includes(v));
       // check if the array is stored as ObjectId in the db
       const raw = await findRawModelDataAsync('ArticleC', found[0].id);
-      raw.xidArr[0].should.be.an.instanceOf(ds.ObjectID);
-      raw.xidArr[1].should.be.an.instanceOf(ds.ObjectID);
+      assert.ok(raw.xidArr[0] instanceof ds.ObjectID);
+      assert.ok(raw.xidArr[1] instanceof ds.ObjectID);
     });
 
     it('handles auto-generated PK properties defined in LB4 style', async () => {
@@ -166,7 +168,7 @@ describe('ObjectID', function() {
       // the test passes when this call does not throw
     });
 
-    context('where clause', () => {
+    describe('where clause', () => {
       it('should properly convert an array of ObjectIDs - implicit equal operator', async () => {
         await Article.create({
           xid: objectIDLikeString,
@@ -175,11 +177,11 @@ describe('ObjectID', function() {
         });
         const found = await Article.find({where: {xidArr: [objectIDLikeString, objectIDLikeString2]}});
 
-        found[0].xidArr.should.containDeep([objectIDLikeString, objectIDLikeString2]);
+        for (const v of [objectIDLikeString, objectIDLikeString2]) assert.ok(found[0].xidArr.includes(v));
         // check if the array is stored in ObjectId
         const raw = await findRawModelDataAsync('ArticleC', found[0].id);
-        raw.xidArr[0].should.be.an.instanceOf(ds.ObjectID);
-        raw.xidArr[1].should.be.an.instanceOf(ds.ObjectID);
+        assert.ok(raw.xidArr[0] instanceof ds.ObjectID);
+        assert.ok(raw.xidArr[1] instanceof ds.ObjectID);
       });
 
       it('should properly convert an array of ObjectIDs - extended operator', async () => {
@@ -193,16 +195,16 @@ describe('ObjectID', function() {
           {allowExtendedOperators: true},
         );
 
-        found[0].xidArr.should.containDeep([objectIDLikeString, objectIDLikeString2]);
+        for (const v of [objectIDLikeString, objectIDLikeString2]) assert.ok(found[0].xidArr.includes(v));
         // check if the array is stored in ObjectId
         const raw = await findRawModelDataAsync('ArticleC', found[0].id);
-        raw.xidArr[0].should.be.an.instanceOf(ds.ObjectID);
-        raw.xidArr[1].should.be.an.instanceOf(ds.ObjectID);
+        assert.ok(raw.xidArr[0] instanceof ds.ObjectID);
+        assert.ok(raw.xidArr[1] instanceof ds.ObjectID);
       });
     });
   });
 
-  context('ObjectID as a constructor', function() {
+  describe('ObjectID as a constructor', function() {
     const Article = ds.createModel(
       'ArticleC2',
       {
@@ -213,14 +215,14 @@ describe('ObjectID', function() {
       {strictObjectIDCoercion: true},
     );
 
-    beforeEach(function(done) {
-      Article.deleteAll(done);
-    });
+    beforeEach(() => new Promise((resolve, reject) => {
+      Article.deleteAll((err) => err ? reject(err) : resolve());
+    }));
 
     it('should save as ObjectID regardless of strictObjectIDCoercion: true', async function() {
       await Article.create({xid: objectIDLikeString, title: 'abc'});
       const found = await Article.findOne({where: {title: 'abc'}});
-      found.xid.should.be.an.instanceOf(ds.ObjectID);
+      assert.ok(found.xid instanceof ds.ObjectID);
     });
 
     it('should properly save an array of ObjectIDs', async () => {
@@ -230,7 +232,11 @@ describe('ObjectID', function() {
         title: 'arrayOfObjectID',
       });
       const found = await Article.findOne({where: {title: 'arrayOfObjectID'}});
-      found.xidArr.should.be.an.Array().which.containDeep([new ds.ObjectID(objectIDLikeString)]);
+      assert.ok(Array.isArray(found.xidArr));
+      const sub = [new ds.ObjectID(objectIDLikeString)];
+      assert.ok(sub.every(v => found.xidArr.some(
+        a => a === v || (typeof a === 'object' && JSON.stringify(a) === JSON.stringify(v)),
+      )));
     });
   });
   function findRawModelData(modelName, id, cb) {

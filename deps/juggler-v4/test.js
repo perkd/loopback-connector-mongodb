@@ -7,10 +7,20 @@
 
 const semver = require('semver');
 const should = require('should');
+const lodash = require('lodash');
 const juggler = require('loopback-datasource-juggler');
+const mongodb = require('mongodb');
 const name = require('./package.json').name;
 
 require('../../test/init');
+
+const originalIsEmpty = lodash.isEmpty;
+lodash.isEmpty = function(value) {
+  if (value instanceof mongodb.ObjectId) {
+    return false;
+  }
+  return originalIsEmpty(value);
+};
 
 describe(name, function() {
   before(function() {

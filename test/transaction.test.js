@@ -4,13 +4,16 @@
 // License text available at https://opensource.org/licenses/MIT
 
 'use strict';
-const should = require('./init.js');
+const {describe, it, before, beforeEach} = require('node:test');
+const assert = require('node:assert/strict');
 const Transaction = require('loopback-connector/lib/transaction');
+
+require('./init.js');
 
 const juggler = require('loopback-datasource-juggler');
 let db, Post, Review;
 describe.skip('transactions', function() {
-  before(function(done) {
+  before(() => new Promise((resolve, reject) => {
     // use run-rs -v 4.2.0 --host localhost --portStart 27000 to start replicaset for transaction testing
     db = global.getDataSource({
       url: 'mongodb://localhost:27000,localhost:27001,localhost:27002/testdb?replicaSet=rs',
@@ -26,23 +29,25 @@ describe.skip('transactions', function() {
         content: {type: String},
       });
       Post.hasMany(Review, {as: 'reviews', foreignKey: 'postId'});
-      db.automigrate(done);
+      db.automigrate((err) => err ? reject(err) : resolve());
     });
-  });
+  }));
 
   let currentTx;
   let hooks = [];
   // Return an async function to start a transaction and create a post
   function createPostInTx(post, timeout) {
-    return function(done) {
-      // Transaction.begin(db.connector, Transaction.READ_COMMITTED,
+    return () => new Promise((resolve, reject) => {
       Post.beginTransaction({
         isolationLevel: Transaction.READ_COMMITTED,
         timeout: timeout,
       },
       function(err, tx) {
-        if (err) return done(err);
-        tx.should.have.property('id').and.be.a.String();
+        if (err) return reject(err);
+        try {
+          assert.ok('id' in tx);
+          assert.strictEqual(typeof tx.id, 'string');
+        } catch (e) { return reject(e); }
         hooks = [];
         tx.observe('before commit', function(context, next) {
           hooks.push('before commit');
@@ -64,54 +69,58 @@ describe.skip('transactions', function() {
         Post.create(post, {transaction: tx, model: 'Post'},
           function(err, p) {
             if (err) {
-              done(err);
+              reject(err);
             } else {
               p.reviews.create({
                 author: 'John',
                 content: 'Review for ' + p.title,
               }, {transaction: tx, model: 'Review'},
               function(err, c) {
-                done(err);
+                if (err) reject(err); else resolve();
               });
             }
           });
       });
-    };
+    });
   }
 
   // Return an async function to find matching posts and assert number of
   // records to equal to the count
   function expectToFindPosts(where, count, inTx) {
-    return function(done) {
+    return () => new Promise((resolve, reject) => {
       const options = {model: 'Post'};
       if (inTx) {
         options.transaction = currentTx;
       }
       Post.find({where: where}, options,
         function(err, posts) {
-          if (err) return done(err);
-          posts.length.should.equal(count);
+          if (err) return reject(err);
+          try {
+            assert.strictEqual(posts.length, count);
+          } catch (e) { return reject(e); }
           // Make sure both find() and count() behave the same way
           Post.count(where, options,
             function(err, result) {
-              if (err) return done(err);
-              result.should.equal(count);
+              if (err) return reject(err);
+              try {
+                assert.strictEqual(result, count);
+              } catch (e) { return reject(e); }
               if (count) {
                 // Find related reviews
                 options.model = 'Review';
-                // Please note the empty {} is required, otherwise, the options
-                // will be treated as a filter
                 posts[0].reviews({}, options, function(err, reviews) {
-                  if (err) return done(err);
-                  reviews.length.should.equal(count);
-                  done();
+                  if (err) return reject(err);
+                  try {
+                    assert.strictEqual(reviews.length, count);
+                    resolve();
+                  } catch (e) { reject(e); }
                 });
               } else {
-                done();
+                resolve();
               }
             });
         });
-    };
+    });
   }
 
   describe('commit', function() {
@@ -123,21 +132,25 @@ describe.skip('transactions', function() {
     it('should see the uncommitted insert from the same transaction',
       expectToFindPosts(post, 1, true));
 
-    it('should commit a transaction', function(done) {
+    it('should commit a transaction', () => new Promise((resolve, reject) => {
       currentTx.commit(function(err) {
-        hooks.should.eql(['before commit', 'after commit']);
-        done(err);
+        try {
+          assert.deepStrictEqual(hooks, ['before commit', 'after commit']);
+          if (err) reject(err); else resolve();
+        } catch (e) { reject(e); }
       });
-    });
+    }));
 
     it('should see the committed insert', expectToFindPosts(post, 1));
 
-    it('should report error if the transaction is not active', function(done) {
+    it('should report error if the transaction is not active', () => new Promise((resolve, reject) => {
       currentTx.commit(function(err) {
-        err.should.be.instanceof(Error);
-        done();
+        try {
+          assert.ok(err instanceof Error);
+          resolve();
+        } catch (e) { reject(e); }
       });
-    });
+    }));
   });
 
   describe('rollback', function() {
@@ -154,21 +167,25 @@ describe.skip('transactions', function() {
     it('should see the uncommitted insert from the same transaction',
       expectToFindPosts(post, 1, true));
 
-    it('should rollback a transaction', function(done) {
+    it('should rollback a transaction', () => new Promise((resolve, reject) => {
       currentTx.rollback(function(err) {
-        hooks.should.eql(['before rollback', 'after rollback']);
-        done(err);
+        try {
+          assert.deepStrictEqual(hooks, ['before rollback', 'after rollback']);
+          if (err) reject(err); else resolve();
+        } catch (e) { reject(e); }
       });
-    });
+    }));
 
     it('should not see the rolledback insert', expectToFindPosts(post, 0));
 
-    it('should report error if the transaction is not active', function(done) {
+    it('should report error if the transaction is not active', () => new Promise((resolve, reject) => {
       currentTx.rollback(function(err) {
-        err.should.be.instanceof(Error);
-        done();
+        try {
+          assert.ok(err instanceof Error);
+          resolve();
+        } catch (e) { reject(e); }
       });
-    });
+    }));
   });
 
   describe('timeout', function() {
@@ -181,54 +198,56 @@ describe.skip('transactions', function() {
     const post = {title: 't3', content: 'c3'};
     beforeEach(createPostInTx(post, TIMEOUT));
 
-    it('should report timeout', function(done) {
+    it('should report timeout', () => new Promise((resolve, reject) => {
       // wait until the "create post" transaction times out
       setTimeout(runTheTest, TIMEOUT * 3);
 
       function runTheTest() {
         Post.find({where: {title: 't3'}}, {transaction: currentTx},
           function(err, posts) {
-            err.should.match(/transaction.*not active/);
-            done();
+            try {
+              assert.match(String(err), /transaction.*not active/);
+              resolve();
+            } catch (e) { reject(e); }
           });
       }
-    });
+    }));
 
-    it('should invoke the timeout hook', function(done) {
+    it('should invoke the timeout hook', {timeout: TIMEOUT * 3}, () => new Promise((resolve) => {
       currentTx.observe('timeout', function(context, next) {
         next();
-        done();
+        resolve();
       });
-
-      // If the event is not fired quickly enough, then the test can
-      // quickly fail - no need to wait full two seconds (Mocha's default)
-      this.timeout(TIMEOUT * 3);
-    });
+    }));
   });
 
   describe('isActive', function() {
-    it('returns true when connection is active', function(done) {
+    it('returns true when connection is active', () => new Promise((resolve, reject) => {
       Post.beginTransaction({
         isolationLevel: Transaction.READ_COMMITTED,
         timeout: 1000,
       },
       function(err, tx) {
-        if (err) return done(err);
-        tx.isActive().should.equal(true);
-        return done();
+        if (err) return reject(err);
+        try {
+          assert.strictEqual(tx.isActive(), true);
+          resolve();
+        } catch (e) { reject(e); }
       });
-    });
-    it('returns false when connection is not active', function(done) {
+    }));
+    it('returns false when connection is not active', () => new Promise((resolve, reject) => {
       Post.beginTransaction({
         isolationLevel: Transaction.READ_COMMITTED,
         timeout: 1000,
       },
       function(err, tx) {
-        if (err) return done(err);
-        delete tx.connection;
-        tx.isActive().should.equal(false);
-        return done();
+        if (err) return reject(err);
+        try {
+          delete tx.connection;
+          assert.strictEqual(tx.isActive(), false);
+          resolve();
+        } catch (e) { reject(e); }
       });
-    });
+    }));
   });
 });

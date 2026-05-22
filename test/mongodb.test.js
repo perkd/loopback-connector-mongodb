@@ -7,9 +7,30 @@
 
 // This test written in mocha+should.js
 const semver = require('semver');
-const should = require('./init.js');
+require('./init.js');
+
+const {describe, it, before, beforeEach, after, afterEach} = require('node:test');
+const assert = require('node:assert/strict');
 const testUtils = require('../lib/test-utils');
-const async = require('async');
+
+function __CONTAIN_FN__(actual, expected) {
+  const norm = v => JSON.parse(JSON.stringify(v));
+  const a = norm(actual);
+  const e = norm(expected);
+  function contains(act, exp) {
+    if (Array.isArray(exp)) {
+      if (!Array.isArray(act)) return false;
+      return exp.every(es => act.some(ae => contains(ae, es)));
+    }
+    if (exp !== null && typeof exp === 'object') {
+      if (act === null || typeof act !== 'object') return false;
+      return Object.keys(exp).every(k => contains(act[k], exp[k]));
+    }
+    return act === exp;
+  }
+  assert.ok(contains(a, e), 'Expected ' + JSON.stringify(a) + ' to contain ' + JSON.stringify(e));
+}
+
 const sinon = require('sinon');
 const sanitizeFilter = require('../lib/mongodb').sanitizeFilter;
 const trimLeadingDollarSigns = require('../lib/mongodb').trimLeadingDollarSigns;
@@ -35,23 +56,23 @@ let Superhero,
   WithInvalidCustomIdFieldName;
 
 describe('connect', function() {
-  it('should skip connect phase (lazyConnect = true)', function(done) {
+  it('should skip connect phase (lazyConnect = true)', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       host: '127.0.0.1',
       port: 4,
       lazyConnect: true,
     });
     const errTimeout = setTimeout(function() {
-      done();
+      resolve();
     }, 2000);
 
     ds.on('error', function(err) {
       clearTimeout(errTimeout);
-      done(err);
+      reject(err);
     });
-  });
+  }));
 
-  it('should report connection error (lazyConnect = false)', function(done) {
+  it('should report connection error (lazyConnect = false)', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       host: '127.0.0.1',
       port: 4,
@@ -60,28 +81,28 @@ describe('connect', function() {
     });
 
     ds.on('error', function(err) {
-      should.exist(err);
-      err.name.should.equalOneOf('MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError');
-      err.message.should.match(/connect ECONNREFUSED/);
-      done();
+      assert.ok(err != null);
+      assert.ok(['MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(err.name));
+      assert.match(String(err.message), /connect ECONNREFUSED/);
+      resolve();
     });
-  });
+  }));
 
-  it('should report url parsing error', function(done) {
+  it('should report url parsing error', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       url: 'mongodb://xyz:@127.0.0.1:4/xyz_dev_db',
       serverSelectionTimeoutMS: 1000,
     });
 
     ds.on('error', function(err) {
-      should.exist(err);
-      err.name.should.equalOneOf('MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError');
-      err.message.should.match(/connect ECONNREFUSED/);
-      done();
+      assert.ok(err != null);
+      assert.ok(['MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(err.name));
+      assert.match(String(err.message), /connect ECONNREFUSED/);
+      resolve();
     });
-  });
+  }));
 
-  it('should connect on execute (lazyConnect = true)', function(done) {
+  it('should connect on execute (lazyConnect = true)', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       host: '127.0.0.1',
       port: global.config.port,
@@ -98,15 +119,15 @@ describe('connect', function() {
       {value: 'test value'},
       function(err, success) {
         if (err) {
-          done(err);
+          reject(err);
         } else {
-          done();
+          resolve();
         }
       },
     );
-  });
+  }));
 
-  it('should reconnect on execute when disconnected (lazyConnect = true)', function(done) {
+  it('should reconnect on execute when disconnected (lazyConnect = true)', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       host: '127.0.0.1',
       port: global.config.port,
@@ -117,30 +138,30 @@ describe('connect', function() {
       value: {type: String},
     });
 
-    ds.connector.should.not.have.property('db');
+    assert.strictEqual(ds.connector['db'], undefined);
 
     ds.connector.execute(
       'TestLazy',
       'insertOne',
       {value: 'test value'},
       function(err, success) {
-        if (err) return done(err);
+        if (err) return reject(err);
         const id = success.insertedId;
-        ds.connector.should.have.property('db');
+        assert.ok('db' in ds.connector);
 
         ds.connector.disconnect(function(err) {
-          if (err) return done(err);
+          if (err) return reject(err);
           ds.connector.execute('TestLazy', 'findOne', {_id: id}, function(
             err,
             data,
           ) {
-            if (err) return done(err);
-            done();
+            if (err) return reject(err);
+            resolve();
           });
         });
       },
     );
-  });
+  }));
 });
 
 describe('mongodb connector', function() {
@@ -356,7 +377,7 @@ describe('mongodb connector', function() {
     Post.belongsTo(User);
   });
 
-  beforeEach(function(done) {
+  beforeEach(() => new Promise((resolve, reject) => {
     User.settings.mongodb = {};
     User.destroyAll(function() {
       Post.destroyAll(function() {
@@ -367,7 +388,7 @@ describe('mongodb connector', function() {
                 PostWithDisableDefaultSort.destroyAll(function() {
                   Category.destroyAll(function() {
                     WithEmbeddedProperties.destroyAll(function() {
-                      done();
+                      resolve();
                     });
                   });
                 });
@@ -377,49 +398,49 @@ describe('mongodb connector', function() {
         });
       });
     });
-  });
+  }));
 
   describe('.ping(cb)', function() {
-    it('should return true for valid connection', function(done) {
-      db.ping(done);
-    });
+    it('should return true for valid connection', () => new Promise((resolve, reject) => {
+      db.ping((err) => err ? reject(err) : resolve());
+    }));
 
-    it('should report connection errors with invalid config', function(done) {
+    it('should report connection errors with invalid config', () => new Promise((resolve, reject) => {
       const ds = global.getDataSource({
         host: 'localhost',
         port: 4, // unassigned by IANA
         serverSelectionTimeoutMS: 1000,
       });
       ds.ping(function(err) {
-        should.exist(err);
-        err.name.should.equalOneOf('MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError');
-        err.message.should.match(/connect ECONNREFUSED/);
-        done();
+        assert.ok(err != null);
+        assert.ok(['MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(err.name));
+        assert.match(String(err.message), /connect ECONNREFUSED/);
+        resolve();
       });
-    });
+    }));
 
-    it('ignores invalid option', function(done) {
+    it('ignores invalid option', () => new Promise((resolve, reject) => {
       const configWithInvalidOption = Object.assign({}, global.config, {
         invalidOption: 'invalid',
       });
       const ds = global.getDataSource(configWithInvalidOption);
       ds.ping(function(err) {
-        if (err) return done(err);
-        ds.disconnect(done);
+        if (err) return reject(err);
+        ds.disconnect((err) => err ? reject(err) : resolve());
       });
-    });
+    }));
 
-    it('accepts database from the url', function(done) {
+    it('accepts database from the url', () => new Promise((resolve, reject) => {
       const cfg = JSON.parse(JSON.stringify(global.config));
       delete cfg.database;
       const ds = global.getDataSource(cfg);
       ds.ping(function(err) {
-        if (err) return done(err);
-        ds.disconnect(done);
+        if (err) return reject(err);
+        ds.disconnect((err) => err ? reject(err) : resolve());
       });
-    });
+    }));
 
-    it('should prioritize to the database given in the url property', function(done) {
+    it('should prioritize to the database given in the url property', () => new Promise((resolve, reject) => {
       const cfg = JSON.parse(JSON.stringify(global.config));
       const testDb = 'lb-ds-overriden-test-1';
       cfg.url = 'mongodb://' + cfg.host + ':' + cfg.port + '/' + testDb;
@@ -428,7 +449,7 @@ describe('mongodb connector', function() {
         const db = ds.connector.db;
         let validationError = null;
         try {
-          db.should.have.property('databaseName', testDb); // check the db name in the db instance
+          assert.strictEqual(db['databaseName'], testDb); // check the db name in the db instance
         } catch (err) {
           // async error
           validationError = err;
@@ -438,14 +459,15 @@ describe('mongodb connector', function() {
           ds.disconnect(function(disconnectError) {
             if (disconnectError && !validationError)
               validationError = disconnectError;
-            done(validationError);
+            if (validationError) reject(validationError); else resolve();
           });
         });
       });
-    });
+    }));
   });
 
   describe('order filters', function() {
+    let employeeDb;
     const data = [
       {
         id: 1,
@@ -466,72 +488,73 @@ describe('mongodb connector', function() {
         contact: 'bar@bar.com',
       },
     ];
-    before(function(done) {
-      db = global.getDataSource();
+    before(() => new Promise((resolve, reject) => {
+      employeeDb = global.getDataSource();
 
-      Employee = db.define('Employee', {
+      Employee = employeeDb.define('Employee', {
         id: {type: Number, id: true},
         title: {type: String, length: 255},
         name: {type: String},
         contact: {type: String},
       });
 
-      db.automigrate(function(err) {
-        should.not.exist(err);
-        Employee.create(data, done);
+      employeeDb.automigrate(function(err) {
+        assert.ok(err == null);
+        Employee.create(data, (err) => err ? reject(err) : resolve());
       });
+    }));
+
+    after(() => new Promise((resolve, reject) => {
+      Employee.destroyAll((err) => err ? reject(err) : resolve());
+    }));
+
+    describe('using buildSort directly', function() {
+      it('sort in descending order', () => new Promise((resolve, reject) => {
+        const sort = employeeDb.connector.buildSort('Employee', 'id DESC');
+        assert.ok('_id' in sort);
+        assert.strictEqual(sort._id, -1);
+        resolve();
+      }));
+      it('sort in ascending order', () => new Promise((resolve, reject) => {
+        const sort = employeeDb.connector.buildSort('Employee', 'id ASC');
+        assert.ok('_id' in sort);
+        assert.strictEqual(sort._id, 1);
+        resolve();
+      }));
     });
 
-    after(function(done) {
-      Employee.destroyAll(done);
-    });
-
-    context('using buildSort directly', function() {
-      it('sort in descending order', function(done) {
-        const sort = db.connector.buildSort('Employee', 'id DESC');
-        sort.should.have.property('_id');
-        sort._id.should.equal(-1);
-        done();
-      });
-      it('sort in ascending order', function(done) {
-        const sort = db.connector.buildSort('Employee', 'id ASC');
-        sort.should.have.property('_id');
-        sort._id.should.equal(1);
-        done();
-      });
-    });
-
-    context('using all with order filter', function() {
-      it('find instances in descending order', function(done) {
+    describe('using all with order filter', function() {
+      it('find instances in descending order', () => new Promise((resolve, reject) => {
         Employee.all({order: 'id DESC'}, function(err, result) {
-          should.not.exist(err);
-          should.exist(result);
-          result.length.should.equal(data.length);
-          result[0].toObject().should.deepEqual(data[2]);
-          result[1].toObject().should.deepEqual(data[1]);
-          result[2].toObject().should.deepEqual(data[0]);
-          done();
+          assert.ok(err == null);
+          assert.ok(result != null);
+          assert.strictEqual(result.length, data.length);
+          assert.deepStrictEqual(result[0].toObject(), data[2]);
+          assert.deepStrictEqual(result[1].toObject(), data[1]);
+          assert.deepStrictEqual(result[2].toObject(), data[0]);
+          resolve();
         });
-      });
-      it('find instances in ascending order', function(done) {
+      }));
+      it('find instances in ascending order', () => new Promise((resolve, reject) => {
         Employee.all({order: 'id ASC'}, function(err, result) {
-          should.not.exist(err);
-          should.exist(result);
-          result.length.should.equal(data.length);
-          result[0].toObject().should.deepEqual(data[0]);
-          result[1].toObject().should.deepEqual(data[1]);
-          result[2].toObject().should.deepEqual(data[2]);
-          done();
+          assert.ok(err == null);
+          assert.ok(result != null);
+          assert.strictEqual(result.length, data.length);
+          assert.deepStrictEqual(result[0].toObject(), data[0]);
+          assert.deepStrictEqual(result[1].toObject(), data[1]);
+          assert.deepStrictEqual(result[2].toObject(), data[2]);
+          resolve();
         });
-      });
+      }));
     });
   });
 
-  it('should create indexes', function(done) {
+  it('should create indexes', () => new Promise((resolve, reject) => {
     db.automigrate('User', function() {
       db.connector.db
         .collection('User')
         .indexInformation(function(err, result) {
+          if (err) return reject(err);
           /* eslint-disable camelcase */
           const indexes = {
             _id_: [['_id', 1]],
@@ -541,15 +564,16 @@ describe('mongodb connector', function() {
             email_1: [['email', 1]],
           };
           /* eslint-enable camelcase */
-          indexes.should.eql(result);
-          done(err, result);
+          assert.deepStrictEqual(indexes, result);
+          resolve();
         });
     });
-  });
+  }));
 
-  it('should create complex indexes', function(done) {
+  it('should create complex indexes', () => new Promise((resolve, reject) => {
     db.automigrate('Superhero', function() {
       db.connector.db.collection('sh').indexInformation(function(err, result) {
+        if (err) return reject(err);
         /* eslint-disable camelcase */
         const indexes = {
           _id_: [['_id', 1]],
@@ -560,16 +584,16 @@ describe('mongodb connector', function() {
         };
         /* eslint-enable camelcase */
 
-        indexes.should.eql(result);
-        done(err, result);
+        assert.deepStrictEqual(indexes, result);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should create case insensitive indexes', function(done) {
+  it('should create case insensitive indexes', () => new Promise((resolve, reject) => {
     db.automigrate('Category', function() {
       db.connector.db.collection('Category').indexes(function(err, result) {
-        if (err) return done(err);
+        if (err) return reject(err);
         const indexes = [
           {name: '_id_', key: {_id: 1}},
           {name: 'title_1', key: {title: 1}},
@@ -577,262 +601,262 @@ describe('mongodb connector', function() {
           {name: 'posts_1', key: {posts: 1}},
         ];
 
-        result.should.containDeep(indexes);
-        done();
+        __CONTAIN_FN__(result, indexes);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should have created models with correct _id types', function(done) {
-    PostWithObjectId.definition.properties._id.type.should.be.equal(
-      db.ObjectID,
-    );
-    should.not.exist(PostWithObjectId.definition.properties.id);
-    PostWithNumberUnderscoreId.definition.properties._id.type.should.be.equal(
-      Number,
-    );
-    should.not.exist(PostWithNumberUnderscoreId.definition.properties.id);
+  it('should have created models with correct _id types', () => new Promise((resolve, reject) => {
+    assert.strictEqual(PostWithObjectId.definition.properties._id.type,
+      db.ObjectID);
+    assert.ok(PostWithObjectId.definition.properties.id == null);
+    assert.strictEqual(PostWithNumberUnderscoreId.definition.properties._id.type,
+      Number);
+    assert.ok(PostWithNumberUnderscoreId.definition.properties.id == null);
 
-    done();
-  });
+    resolve();
+  }));
 
-  it('should handle correctly type Number for id field _id', function(done) {
+  it('should handle correctly type Number for id field _id', () => new Promise((resolve, reject) => {
     PostWithNumberUnderscoreId.create({_id: 3, content: 'test'}, function(
       err,
       person,
     ) {
-      should.not.exist(err);
-      person._id.should.be.equal(3);
+      assert.ok(err == null);
+      assert.strictEqual(person._id, 3);
 
       PostWithNumberUnderscoreId.findById(person._id, function(err, p) {
-        should.not.exist(err);
-        p.content.should.be.equal('test');
+        assert.ok(err == null);
+        assert.strictEqual(p.content, 'test');
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should handle correctly type Number for id field _id using string', function(done) {
+  it('should handle correctly type Number for id field _id using string', () => new Promise((resolve, reject) => {
     PostWithNumberUnderscoreId.create({_id: 4, content: 'test'}, function(
       err,
       person,
     ) {
-      should.not.exist(err);
-      person._id.should.be.equal(4);
+      assert.ok(err == null);
+      assert.strictEqual(person._id, 4);
 
       PostWithNumberUnderscoreId.findById('4', function(err, p) {
-        should.not.exist(err);
-        p.content.should.be.equal('test');
+        assert.ok(err == null);
+        assert.strictEqual(p.content, 'test');
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find post by id string if `_id` is defined id', function(done) {
+  it('should allow to find post by id string if `_id` is defined id', () => new Promise((resolve, reject) => {
     PostWithObjectId.create(function(err, post) {
       PostWithObjectId.find({where: {_id: post._id.toString()}}, function(
         err,
         p,
       ) {
-        should.not.exist(err);
+        assert.ok(err == null);
         post = p[0];
-        should.exist(post);
-        post._id.should.be.an.instanceOf(db.ObjectID);
+        assert.ok(post != null);
+        assert.ok(post._id instanceof db.ObjectID);
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('find with `_id` as defined id should return an object with _id instanceof ObjectID', function(done) {
-    PostWithObjectId.create(function(err, post) {
-      PostWithObjectId.findById(post._id, function(err, post) {
-        should.not.exist(err);
-        post._id.should.be.an.instanceOf(db.ObjectID);
+  it('find with `_id` as defined id should return an object with _id instanceof ObjectID',
+    () => new Promise((resolve, reject) => {
+      PostWithObjectId.create(function(err, post) {
+        PostWithObjectId.findById(post._id, function(err, post) {
+          assert.ok(err == null);
+          assert.ok(post._id instanceof db.ObjectID);
 
-        done();
+          resolve();
+        });
       });
-    });
-  });
+    }));
 
-  it('should update the instance with `_id` as defined id', function(done) {
+  it('should update the instance with `_id` as defined id', () => new Promise((resolve, reject) => {
     PostWithObjectId.create({title: 'a', content: 'AAA'}, function(
       err,
       post,
     ) {
       post.title = 'b';
       PostWithObjectId.updateOrCreate(post, function(err, p) {
-        should.not.exist(err);
-        p._id.should.be.equal(post._id);
+        assert.ok(err == null);
+        assert.strictEqual(p._id, post._id);
 
         PostWithObjectId.findById(post._id, function(err, p) {
-          should.not.exist(err);
-          p._id.should.be.eql(post._id);
-          p.content.should.be.equal(post.content);
-          p.title.should.be.equal('b');
+          assert.ok(err == null);
+          assert.deepStrictEqual(p._id, post._id);
+          assert.strictEqual(p.content, post.content);
+          assert.strictEqual(p.title, 'b');
         });
 
         PostWithObjectId.find({where: {title: 'b'}}, function(err, posts) {
-          should.not.exist(err);
+          assert.ok(err == null);
           p = posts[0];
-          p._id.should.be.eql(post._id);
-          p.content.should.be.equal(post.content);
-          p.title.should.be.equal('b');
-          posts.should.have.lengthOf(1);
-          done();
+          assert.deepStrictEqual(p._id, post._id);
+          assert.strictEqual(p.content, post.content);
+          assert.strictEqual(p.title, 'b');
+          assert.strictEqual(posts.length, 1);
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('all should return object (with `_id` as defined id) with an _id instanceof ObjectID', function(done) {
-    const post = new PostWithObjectId({title: 'a', content: 'AAA'});
-    post.save(function(err, post) {
-      PostWithObjectId.all({where: {title: 'a'}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.lengthOf(1);
-        post = posts[0];
-        post.should.have.property('title', 'a');
-        post.should.have.property('content', 'AAA');
-        post._id.should.be.an.instanceOf(db.ObjectID);
+  it('all should return object (with `_id` as defined id) with an _id instanceof ObjectID',
+    () => new Promise((resolve, reject) => {
+      const post = new PostWithObjectId({title: 'a', content: 'AAA'});
+      post.save(function(err, post) {
+        PostWithObjectId.all({where: {title: 'a'}}, function(err, posts) {
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
+          post = posts[0];
+          assert.strictEqual(post['title'], 'a');
+          assert.strictEqual(post['content'], 'AAA');
+          assert.ok(post._id instanceof db.ObjectID);
 
-        done();
+          resolve();
+        });
       });
-    });
-  });
+    }));
 
-  it('all return should honor filter.fields, with `_id` as defined id', function(done) {
+  it('all return should honor filter.fields, with `_id` as defined id', () => new Promise((resolve, reject) => {
     const post = new PostWithObjectId({title: 'a', content: 'AAA'});
     post.save(function(err, post) {
       PostWithObjectId.all(
         {fields: ['title'], where: {title: 'a'}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.lengthOf(1);
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
           post = posts[0];
-          post.should.have.property('title', 'a');
-          post.should.have.property('content', undefined);
-          should.not.exist(post._id);
+          assert.strictEqual(post['title'], 'a');
+          assert.strictEqual(post['content'], undefined);
+          assert.ok(post._id == null);
 
-          done();
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('all return should honor filter.fields with `_id` selected', function(done) {
+  it('all return should honor filter.fields with `_id` selected', () => new Promise((resolve, reject) => {
     const post = new PostWithObjectId({title: 'a', content: 'AAA'});
     post.save(function(err, post) {
       PostWithObjectId.all(
         {fields: ['_id', 'content'], where: {title: 'a'}},
         function(err, posts) {
-          should.not.exist(err);
-          if (err) return done(err);
-          posts.should.have.lengthOf(1);
+          assert.ok(err == null);
+          if (err) return reject(err);
+          assert.strictEqual(posts.length, 1);
           post = posts[0];
-          should.not.exist(post.title);
-          post.should.have.property('content', 'AAA');
-          post._id.should.be.an.instanceOf(db.ObjectID);
+          assert.ok(post.title == null);
+          assert.strictEqual(post['content'], 'AAA');
+          assert.ok(post._id instanceof db.ObjectID);
 
-          done();
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support Buffer type', function(done) {
+  it('should support Buffer type', () => new Promise((resolve, reject) => {
     User.create({name: 'John', icon: new Buffer('1a2')}, function(e, u) {
       User.findById(u.id, function(e, user) {
-        user.icon.should.be.an.instanceOf(Buffer);
-        done();
+        assert.ok(user.icon instanceof Buffer);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should properly retrieve embedded model properties', function(done) {
+  it('should properly retrieve embedded model properties', () => new Promise((resolve, reject) => {
     const data = {name: 'Mitsos', location: {city: 'Volos', country: 'Greece'}};
     WithEmbeddedProperties.create(data, function(err, createdModel) {
-      if (err) return done(err);
+      if (err) return reject(err);
       WithEmbeddedProperties.findById(createdModel.id, function(err, dbModel) {
-        if (err) return done(err);
+        if (err) return reject(err);
         const modelObj = dbModel.toJSON();
         const dataObj = Object.assign({id: modelObj.id}, data);
-        modelObj.should.be.eql(dataObj);
-        done();
+        assert.deepStrictEqual(modelObj, dataObj);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should not present missing embedded model properties as null', function(done) {
+  it('should not present missing embedded model properties as null', () => new Promise((resolve, reject) => {
     const data = {name: 'Mitsos'};
     WithEmbeddedProperties.create(data, function(err, createdModel) {
-      if (err) return done(err);
+      if (err) return reject(err);
       WithEmbeddedProperties.findById(createdModel.id, function(err, dbModel) {
-        if (err) return done(err);
+        if (err) return reject(err);
         const modelObj = dbModel.toJSON();
         const dataObj = Object.assign({}, data, {id: modelObj.id, location: undefined});
-        modelObj.should.be.eql(dataObj);
-        done();
+        assert.deepStrictEqual(modelObj, dataObj);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should convert embedded model binary properties to buffer correctly', function(done) {
+  it('should convert embedded model binary properties to buffer correctly', () => new Promise((resolve, reject) => {
     const entity = {
       name: 'Rigas',
       image: {label: 'paris 2016', rawImg: Buffer.from([255, 216, 255, 224])},
     };
     WithEmbeddedBinaryProperties.create(entity, function(e, r) {
       WithEmbeddedBinaryProperties.findById(r.id, function(e, post) {
-        post.image.rawImg.should.be.eql(Buffer.from([255, 216, 255, 224]));
-        done();
+        assert.deepStrictEqual(post.image.rawImg, Buffer.from([255, 216, 255, 224]));
+        resolve();
       });
     });
-  });
+  }));
 
-  it('hasMany should support additional conditions', function(done) {
+  it('hasMany should support additional conditions', () => new Promise((resolve, reject) => {
     User.create(function(e, u) {
       u.posts.create({}, function(e, p) {
         u.posts({where: {id: p.id}}, function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.lengthOf(1);
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('create should return id field but not mongodb _id', function(done) {
+  it('create should return id field but not mongodb _id', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post content'}, function(
       err,
       post,
     ) {
       // console.log('create should', err, post);
-      should.not.exist(err);
-      should.exist(post.id);
-      should.not.exist(post._id);
+      assert.ok(err == null);
+      assert.ok(post.id != null);
+      assert.ok(post._id == null);
 
-      done();
+      resolve();
     });
-  });
+  }));
 
-  it('should allow to find by id string', function(done) {
+  it('should allow to find by id string', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post content'}, function(
       err,
       post,
     ) {
       Post.findById(post.id.toString(), function(err, p) {
-        should.not.exist(err);
-        should.exist(p);
-        done();
+        assert.ok(err == null);
+        assert.ok(p != null);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow custom collection name', function(done) {
+  it('should allow custom collection name', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post content'}, function(
       err,
       post,
@@ -840,14 +864,14 @@ describe('mongodb connector', function() {
       Post.dataSource.connector.db
         .collection('PostCollection')
         .findOne({_id: post.id}, function(err, p) {
-          should.not.exist(err);
-          should.exist(p);
-          done();
+          assert.ok(err == null);
+          assert.ok(p != null);
+          resolve();
         });
     });
-  });
+  }));
 
-  it('should allow to find by id using where', function(done) {
+  it('should allow to find by id using where', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post1 content'}, function(
       err,
       p1,
@@ -857,32 +881,32 @@ describe('mongodb connector', function() {
         p2,
       ) {
         Post.find({where: {id: p1.id}}, function(err, p) {
-          should.not.exist(err);
-          should.exist(p && p[0]);
-          p.length.should.be.equal(1);
+          assert.ok(err == null);
+          assert.ok(p && p[0] != null);
+          assert.strictEqual(p.length, 1);
           // Not strict equal
-          p[0].id.should.be.eql(p1.id);
-          done();
+          assert.deepStrictEqual(p[0].id, p1.id);
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('should return data for nested `$where` in where', function(done) {
+  it('should return data for nested `$where` in where', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post1 content'}, (err, p1) => {
       Post.create({title: 'Post2', content: 'Post2 content'}, (err2, p2) => {
         Post.create({title: 'Post3', content: 'Post3 data'}, (err3, p3) => {
           Post.find({where: {$where: 'function() {return this.content.contains("content")}'}}, (err, p) => {
-            should.not.exist(err);
-            p.length.should.be.equal(3);
-            done();
+            assert.ok(err == null);
+            assert.strictEqual(p.length, 3);
+            resolve();
           });
         });
       });
     });
-  });
+  }));
 
-  it('should allow $where in where with options.disableSanitization', function(done) {
+  it('should allow $where in where with options.disableSanitization', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post1 content'}, (err, p1) => {
       Post.create({title: 'Post2', content: 'Post2 content'}, (err2, p2) => {
         Post.create({title: 'Post3', content: 'Post3 data'}, (err3, p3) => {
@@ -890,32 +914,32 @@ describe('mongodb connector', function() {
             {where: {$where: 'function() {return this.content.includes("content")}'}},
             {disableSanitization: true},
             (err, p) => {
-              should.not.exist(err);
-              p.length.should.be.equal(2);
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(p.length, 2);
+              resolve();
             },
           );
         });
       });
     });
-  });
+  }));
 
-  it('does not execute a nested `$where` when extended operators are allowed', function(done) {
+  it('does not execute a nested `$where` when extended operators are allowed', () => new Promise((resolve, reject) => {
     const nestedWhereFilter = {where: {content: {$where: 'function() {return this.content.includes("content")}'}}};
     Post.create({title: 'Post1', content: 'Post1 content'}, (err, p1) => {
       Post.create({title: 'Post2', content: 'Post2 content'}, (err2, p2) => {
         Post.create({title: 'Post3', content: 'Post3 data'}, (err3, p3) => {
           Post.find(nestedWhereFilter, {allowExtendedOperators: true}, (err, p) => {
-            should.exist(err);
-            err.message.should.match(/\$where/);
-            done();
+            assert.ok(err != null);
+            assert.match(String(err.message), /\$where/);
+            resolve();
           });
         });
       });
     });
-  });
+  }));
 
-  it('should allow to find by id using where inq', function(done) {
+  it('should allow to find by id using where inq', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post1 content'}, function(
       err,
       p1,
@@ -925,28 +949,28 @@ describe('mongodb connector', function() {
         p2,
       ) {
         Post.find({where: {id: {inq: [p1.id]}}}, function(err, p) {
-          should.not.exist(err);
-          should.exist(p && p[0]);
-          p.length.should.be.equal(1);
+          assert.ok(err == null);
+          assert.ok(p && p[0] != null);
+          assert.strictEqual(p.length, 1);
           // Not strict equal
-          p[0].id.should.be.eql(p1.id);
-          done();
+          assert.deepStrictEqual(p[0].id, p1.id);
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('should invoke hooks', function(done) {
+  it('should invoke hooks', () => new Promise((resolve, reject) => {
     const events = [];
     const connector = Post.getDataSource().connector;
     connector.observe('before execute', function(ctx, next) {
-      ctx.req.command.should.be.String();
-      ctx.req.params.should.be.Array();
+      assert.strictEqual(typeof ctx.req.command, 'string');
+      assert.ok(Array.isArray(ctx.req.params));
       events.push('before execute ' + ctx.req.command);
       next();
     });
     connector.observe('after execute', function(ctx, next) {
-      ctx.res.should.be.Object();
+      assert.ok(ctx.res !== null && typeof ctx.res === 'object');
       events.push('after execute ' + ctx.req.command);
       next();
     });
@@ -955,7 +979,7 @@ describe('mongodb connector', function() {
       p1,
     ) {
       Post.find(function(err, results) {
-        events.should.eql([
+        assert.deepStrictEqual(events, [
           'before execute insert',
           'after execute insert',
           'before execute find',
@@ -963,12 +987,12 @@ describe('mongodb connector', function() {
         ]);
         connector.clearObservers('before execute');
         connector.clearObservers('after execute');
-        done(err, results);
+        if (err) reject(err); else resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find by number id using where', function(done) {
+  it('should allow to find by number id using where', () => new Promise((resolve, reject) => {
     PostWithNumberId.create(
       {id: 1, title: 'Post1', content: 'Post1 content'},
       function(err, p1) {
@@ -976,19 +1000,19 @@ describe('mongodb connector', function() {
           {id: 2, title: 'Post2', content: 'Post2 content'},
           function(err, p2) {
             PostWithNumberId.find({where: {id: p1.id}}, function(err, p) {
-              should.not.exist(err);
-              should.exist(p && p[0]);
-              p.length.should.be.equal(1);
-              p[0].id.should.be.eql(p1.id);
-              done();
+              assert.ok(err == null);
+              assert.ok(p && p[0] != null);
+              assert.strictEqual(p.length, 1);
+              assert.deepStrictEqual(p[0].id, p1.id);
+              resolve();
             });
           },
         );
       },
     );
-  });
+  }));
 
-  it('should allow to find by number id using where inq', function(done) {
+  it('should allow to find by number id using where inq', () => new Promise((resolve, reject) => {
     PostWithNumberId.create(
       {id: 1, title: 'Post1', content: 'Post1 content'},
       function(err, p1) {
@@ -999,23 +1023,23 @@ describe('mongodb connector', function() {
               err,
               p,
             ) {
-              should.not.exist(err);
-              should.exist(p && p[0]);
-              p.length.should.be.equal(1);
-              p[0].id.should.be.eql(p1.id);
+              assert.ok(err == null);
+              assert.ok(p && p[0] != null);
+              assert.strictEqual(p.length, 1);
+              assert.deepStrictEqual(p[0].id, p1.id);
               PostWithNumberId.find(
                 {where: {id: {inq: [1, 2]}}},
                 function(err, p) {
-                  should.not.exist(err);
-                  p.length.should.be.equal(2);
-                  p[0].id.should.be.eql(p1.id);
-                  p[1].id.should.be.eql(p2.id);
+                  assert.ok(err == null);
+                  assert.strictEqual(p.length, 2);
+                  assert.deepStrictEqual(p[0].id, p1.id);
+                  assert.deepStrictEqual(p[1].id, p2.id);
                   PostWithNumberId.find(
                     {where: {id: {inq: [0]}}},
                     function(err, p) {
-                      should.not.exist(err);
-                      p.length.should.be.equal(0);
-                      done();
+                      assert.ok(err == null);
+                      assert.strictEqual(p.length, 0);
+                      resolve();
                     },
                   );
                 },
@@ -1025,39 +1049,40 @@ describe('mongodb connector', function() {
         );
       },
     );
-  });
+  }));
 
-  it('save should not return mongodb _id', function(done) {
+  it('save should not return mongodb _id', () => new Promise((resolve, reject) => {
     Post.create({title: 'Post1', content: 'Post content'}, function(
       err,
       post,
     ) {
       post.content = 'AAA';
       post.save(function(err, p) {
-        should.not.exist(err);
-        should.not.exist(p._id);
-        p.id.should.be.equal(post.id);
-        p.content.should.be.equal('AAA');
+        assert.ok(err == null);
+        assert.ok(p._id == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.content, 'AAA');
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('find should return an object with an id, which is instanceof ObjectID, but not mongodb _id', function(done) {
-    Post.create({title: 'Post1', content: 'Post content'}, function(
-      err,
-      post,
-    ) {
-      Post.findById(post.id, function(err, post) {
-        should.not.exist(err);
-        post.id.should.be.an.instanceOf(db.ObjectID);
-        should.not.exist(post._id);
+  it('find should return an object with an id, which is instanceof ObjectID, but not mongodb _id',
+    () => new Promise((resolve, reject) => {
+      Post.create({title: 'Post1', content: 'Post content'}, function(
+        err,
+        post,
+      ) {
+        Post.findById(post.id, function(err, post) {
+          assert.ok(err == null);
+          assert.ok(post.id instanceof db.ObjectID);
+          assert.ok(post._id == null);
 
-        done();
+          resolve();
+        });
       });
-    });
-  });
+    }));
 
   describe('updateAll', function() {
     it('should not mutate the input data object', async function() {
@@ -1067,7 +1092,7 @@ describe('mongodb connector', function() {
       userData.age = 100;
 
       await User.update(userData);
-      userData.should.have.property('id', userId);
+      assert.strictEqual(userData['id'], userId);
     });
 
     it('should not mutate the input model instance', async function() {
@@ -1077,41 +1102,41 @@ describe('mongodb connector', function() {
       user.name = 'Albert';
 
       await User.update(user);
-      user.should.have.property('id', userId);
-      user.should.have.property('name', 'Albert');
+      assert.strictEqual(user['id'], userId);
+      assert.strictEqual(user['name'], 'Albert');
     });
 
-    it('should update the instance matching criteria', function(done) {
+    it('should update the instance matching criteria', () => new Promise((resolve, reject) => {
       User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
         err1,
         createdusers1,
       ) {
-        should.not.exist(err1);
+        assert.ok(err1 == null);
         User.create(
           {name: 'Simon', age: 32, email: 'simon@strongloop'},
           function(err2, createdusers2) {
-            should.not.exist(err2);
+            assert.ok(err2 == null);
             User.create(
               {name: 'Ray', age: 31, email: 'ray@strongloop'},
               function(err3, createdusers3) {
-                should.not.exist(err3);
+                assert.ok(err3 == null);
 
                 User.updateAll(
                   {age: 31},
                   {company: 'strongloop.com'},
                   function(err, updatedusers) {
-                    should.not.exist(err);
-                    updatedusers.should.have.property('count', 2);
+                    assert.ok(err == null);
+                    assert.strictEqual(updatedusers['count'], 2);
 
                     User.find({where: {age: 31}}, function(
                       err2,
                       foundusers,
                     ) {
-                      should.not.exist(err2);
-                      foundusers[0].company.should.be.equal('strongloop.com');
-                      foundusers[1].company.should.be.equal('strongloop.com');
+                      assert.ok(err2 == null);
+                      assert.strictEqual(foundusers[0].company, 'strongloop.com');
+                      assert.strictEqual(foundusers[1].company, 'strongloop.com');
 
-                      done();
+                      resolve();
                     });
                   },
                 );
@@ -1120,62 +1145,62 @@ describe('mongodb connector', function() {
           },
         );
       });
-    });
+    }));
 
-    it('should clean the data object', function(done) {
+    it('should clean the data object', () => new Promise((resolve, reject) => {
       User.dataSource.settings.allowExtendedOperators = true;
 
       User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
         err1,
         createdusers1,
       ) {
-        should.not.exist(err1);
+        assert.ok(err1 == null);
         User.create(
           {name: 'Simon', age: 32, email: 'simon@strongloop'},
           function(err2, createdusers2) {
-            should.not.exist(err2);
+            assert.ok(err2 == null);
             User.create(
               {name: 'Ray', age: 31, email: 'ray@strongloop'},
               function(err3, createdusers3) {
-                should.not.exist(err3);
+                assert.ok(err3 == null);
                 User.updateAll({}, {age: 40, $set: {age: 39}}, function(
                   err,
                   updatedusers,
                 ) {
-                  should.not.exist(err);
-                  updatedusers.should.have.property('count', 3);
+                  assert.ok(err == null);
+                  assert.strictEqual(updatedusers['count'], 3);
 
                   User.find({where: {age: 40}}, function(err2, foundusers) {
-                    should.not.exist(err2);
-                    foundusers.length.should.be.equal(0);
+                    assert.ok(err2 == null);
+                    assert.strictEqual(foundusers.length, 0);
 
                     User.find({where: {age: 39}}, function(
                       err3,
                       foundusers,
                     ) {
-                      should.not.exist(err3);
-                      foundusers.length.should.be.equal(3);
+                      assert.ok(err3 == null);
+                      assert.strictEqual(foundusers.length, 3);
 
                       User.updateAll(
                         {},
                         {$set: {age: 40}, age: 39},
                         function(err, updatedusers) {
-                          should.not.exist(err);
-                          updatedusers.should.have.property('count', 3);
+                          assert.ok(err == null);
+                          assert.strictEqual(updatedusers['count'], 3);
                           User.find({where: {age: 40}}, function(
                             err2,
                             foundusers,
                           ) {
-                            should.not.exist(err2);
-                            foundusers.length.should.be.equal(3);
+                            assert.ok(err2 == null);
+                            assert.strictEqual(foundusers.length, 3);
                             User.find({where: {age: 39}}, function(
                               err3,
                               foundusers,
                             ) {
-                              should.not.exist(err3);
-                              foundusers.length.should.be.equal(0);
+                              assert.ok(err3 == null);
+                              assert.strictEqual(foundusers.length, 0);
 
-                              done();
+                              resolve();
                             });
                           });
                         },
@@ -1188,7 +1213,7 @@ describe('mongodb connector', function() {
           },
         );
       });
-    });
+    }));
 
     let describeMongo26 = describe;
     if (
@@ -1199,37 +1224,37 @@ describe('mongodb connector', function() {
     }
 
     describeMongo26('extended operators', function() {
-      it('should use $set by default if no operator is supplied', function(done) {
+      it('should use $set by default if no operator is supplied', () => new Promise((resolve, reject) => {
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
           User.create(
             {name: 'Simon', age: 32, email: 'simon@strongloop'},
             function(err2, createdusers2) {
-              should.not.exist(err2);
+              assert.ok(err2 == null);
               User.create(
                 {name: 'Ray', age: 31, email: 'ray@strongloop'},
                 function(err3, createdusers3) {
-                  should.not.exist(err3);
+                  assert.ok(err3 == null);
 
                   User.updateAll({name: 'Simon'}, {name: 'Alex'}, function(
                     err,
                     updatedusers,
                   ) {
-                    should.not.exist(err);
-                    updatedusers.should.have.property('count', 1);
+                    assert.ok(err == null);
+                    assert.strictEqual(updatedusers['count'], 1);
 
                     User.find({where: {name: 'Alex'}}, function(
                       err,
                       founduser,
                     ) {
-                      should.not.exist(err);
-                      founduser.length.should.be.equal(1);
-                      founduser[0].name.should.be.equal('Alex');
+                      assert.ok(err == null);
+                      assert.strictEqual(founduser.length, 1);
+                      assert.strictEqual(founduser[0].name, 'Alex');
 
-                      done();
+                      resolve();
                     });
                   });
                 },
@@ -1237,209 +1262,213 @@ describe('mongodb connector', function() {
             },
           );
         });
-      });
+      }));
 
-      it('should use $set by default if no operator is supplied (using renamed columns)', function(done) {
-        User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
-          err1,
-          createdusers1,
-        ) {
-          should.not.exist(err1);
-          User.create(
-            {name: 'Simon', age: 32, email: 'simon@strongloop'},
-            function(err2, createdusers2) {
-              should.not.exist(err2);
-              User.create(
-                {name: 'Ray', age: 31, email: 'ray@strongloop'},
-                function(err3, createdusers3) {
-                  should.not.exist(err3);
+      it('should use $set by default if no operator is supplied (using renamed columns)',
+        () => new Promise((resolve, reject) => {
+          User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
+            err1,
+            createdusers1,
+          ) {
+            assert.ok(err1 == null);
+            User.create(
+              {name: 'Simon', age: 32, email: 'simon@strongloop'},
+              function(err2, createdusers2) {
+                assert.ok(err2 == null);
+                User.create(
+                  {name: 'Ray', age: 31, email: 'ray@strongloop'},
+                  function(err3, createdusers3) {
+                    assert.ok(err3 == null);
 
-                  UserWithRenamedColumns.updateAll(
-                    {name: 'Simon'},
-                    {renamedName: 'Alex'},
-                    function(err, updatedusers) {
-                      should.not.exist(err);
-                      updatedusers.should.have.property('count', 1);
+                    UserWithRenamedColumns.updateAll(
+                      {name: 'Simon'},
+                      {renamedName: 'Alex'},
+                      function(err, updatedusers) {
+                        assert.ok(err == null);
+                        assert.strictEqual(updatedusers['count'], 1);
 
-                      User.find({where: {name: 'Alex'}}, function(
-                        err,
-                        founduser,
-                      ) {
-                        should.not.exist(err);
-                        founduser.length.should.be.equal(1);
-                        founduser[0].name.should.be.equal('Alex');
+                        User.find({where: {name: 'Alex'}}, function(
+                          err,
+                          founduser,
+                        ) {
+                          assert.ok(err == null);
+                          assert.strictEqual(founduser.length, 1);
+                          assert.strictEqual(founduser[0].name, 'Alex');
 
-                        done();
-                      });
-                    },
-                  );
-                },
-              );
-            },
-          );
-        });
-      });
+                          resolve();
+                        });
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          });
+        }));
 
-      it('should be possible to enable per model settings', function(done) {
+      it('should be possible to enable per model settings', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = null;
         User.settings.mongodb = {allowExtendedOperators: true};
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           User.updateAll(
             {name: 'Al'},
             {$rename: {name: 'firstname'}},
             function(err, updatedusers) {
-              should.not.exist(err);
-              updatedusers.should.have.property('count', 1);
+              assert.ok(err == null);
+              assert.strictEqual(updatedusers['count'], 1);
 
               User.find({where: {firstname: 'Al'}}, function(
                 err,
                 foundusers,
               ) {
-                should.not.exist(err);
-                foundusers.length.should.be.equal(1);
+                assert.ok(err == null);
+                assert.strictEqual(foundusers.length, 1);
 
-                done();
+                resolve();
               });
             },
           );
         });
-      });
+      }));
 
-      it('should not be possible to enable per model settings when globally disabled', function(done) {
-        User.dataSource.settings.allowExtendedOperators = false;
-        User.settings.mongodb = {allowExtendedOperators: true};
-        User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
-          err1,
-          createdusers1,
-        ) {
-          should.not.exist(err1);
+      it('should not be possible to enable per model settings when globally disabled',
+        () => new Promise((resolve, reject) => {
+          User.dataSource.settings.allowExtendedOperators = false;
+          User.settings.mongodb = {allowExtendedOperators: true};
+          User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
+            err1,
+            createdusers1,
+          ) {
+            assert.ok(err1 == null);
 
-          User.updateAll(
-            {name: 'Al'},
-            {$rename: {name: 'firstname'}},
-            function(err, updatedusers) {
-              should.exist(err);
-              err.name.should.equal('MongoServerError');
-              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
-              done();
-            },
-          );
-        });
-      });
+            User.updateAll(
+              {name: 'Al'},
+              {$rename: {name: 'firstname'}},
+              function(err, updatedusers) {
+                assert.ok(err != null);
+                assert.strictEqual(err.name, 'MongoServerError');
+                assert.match(String(err.errmsg), /The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
+                resolve();
+              },
+            );
+          });
+        }));
 
-      it('should not be possible to use when disabled per model settings', function(done) {
+      it('should not be possible to use when disabled per model settings', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
         User.settings.mongodb = {allowExtendedOperators: false};
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           User.updateAll(
             {name: 'Al'},
             {$rename: {name: 'firstname'}},
             function(err, updatedusers) {
-              should.exist(err);
-              err.name.should.equal('MongoServerError');
-              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
-              done();
+              assert.ok(err != null);
+              assert.strictEqual(err.name, 'MongoServerError');
+              assert.match(String(err.errmsg), /The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
+              resolve();
             },
           );
         });
-      });
+      }));
 
-      it('should be possible to enable using options - even if globally disabled', function(done) {
-        User.dataSource.settings.allowExtendedOperators = false;
-        const options = {allowExtendedOperators: true};
-        User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
-          err1,
-          createdusers1,
-        ) {
-          should.not.exist(err1);
+      it('should be possible to enable using options - even if globally disabled',
+        () => new Promise((resolve, reject) => {
+          User.dataSource.settings.allowExtendedOperators = false;
+          const options = {allowExtendedOperators: true};
+          User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
+            err1,
+            createdusers1,
+          ) {
+            assert.ok(err1 == null);
 
-          User.updateAll(
-            {name: 'Al'},
-            {$rename: {name: 'firstname'}},
-            options,
-            function(err, updatedusers) {
-              should.not.exist(err);
-              updatedusers.should.have.property('count', 1);
+            User.updateAll(
+              {name: 'Al'},
+              {$rename: {name: 'firstname'}},
+              options,
+              function(err, updatedusers) {
+                assert.ok(err == null);
+                assert.strictEqual(updatedusers['count'], 1);
 
-              User.find({where: {firstname: 'Al'}}, function(
-                err,
-                foundusers,
-              ) {
-                should.not.exist(err);
-                foundusers.length.should.be.equal(1);
+                User.find({where: {firstname: 'Al'}}, function(
+                  err,
+                  foundusers,
+                ) {
+                  assert.ok(err == null);
+                  assert.strictEqual(foundusers.length, 1);
 
-                done();
-              });
-            },
-          );
-        });
-      });
+                  resolve();
+                });
+              },
+            );
+          });
+        }));
 
-      it('should be possible to disable using options - even if globally disabled', function(done) {
+      it('should be possible to disable using options - even if globally disabled',
+        () => new Promise((resolve, reject) => {
+          User.dataSource.settings.allowExtendedOperators = true;
+          const options = {allowExtendedOperators: false};
+          User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
+            err1,
+            createdusers1,
+          ) {
+            assert.ok(err1 == null);
+
+            User.updateAll(
+              {name: 'Al'},
+              {$rename: {name: 'firstname'}},
+              options,
+              function(err, updatedusers) {
+                assert.ok(err != null);
+                assert.strictEqual(err.name, 'MongoServerError');
+                assert.match(String(err.errmsg), /The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
+                resolve();
+              },
+            );
+          });
+        }));
+
+      it('should be possible to use the $inc operator', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
-        const options = {allowExtendedOperators: false};
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
-
-          User.updateAll(
-            {name: 'Al'},
-            {$rename: {name: 'firstname'}},
-            options,
-            function(err, updatedusers) {
-              should.exist(err);
-              err.name.should.equal('MongoServerError');
-              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
-              done();
-            },
-          );
-        });
-      });
-
-      it('should be possible to use the $inc operator', function(done) {
-        User.dataSource.settings.allowExtendedOperators = true;
-        User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
-          err1,
-          createdusers1,
-        ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
           User.create(
             {name: 'Simon', age: 32, email: 'simon@strongloop'},
             function(err2, createdusers2) {
-              should.not.exist(err2);
+              assert.ok(err2 == null);
               User.create(
                 {name: 'Ray', age: 31, email: 'ray@strongloop'},
                 function(err3, createdusers3) {
-                  should.not.exist(err3);
+                  assert.ok(err3 == null);
 
                   User.updateAll(
                     {name: 'Ray'},
                     {$inc: {age: 2}},
                     function(err, updatedusers) {
-                      should.not.exist(err);
-                      updatedusers.should.have.property('count', 1);
+                      assert.ok(err == null);
+                      assert.strictEqual(updatedusers['count'], 1);
 
                       User.find({where: {name: 'Ray'}}, function(
                         err,
                         foundusers,
                       ) {
-                        should.not.exist(err);
-                        foundusers.length.should.be.equal(1);
-                        foundusers[0].age.should.be.equal(33);
+                        assert.ok(err == null);
+                        assert.strictEqual(foundusers.length, 1);
+                        assert.strictEqual(foundusers[0].age, 33);
 
-                        done();
+                        resolve();
                       });
                     },
                   );
@@ -1448,124 +1477,124 @@ describe('mongodb connector', function() {
             },
           );
         });
-      });
+      }));
 
-      it('should be possible to use the $min and $max operators', function(done) {
+      it('should be possible to use the $min and $max operators', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
         User.create(
           {name: 'Simon', age: 32, email: 'simon@strongloop'},
           function(err2, createdusers2) {
-            should.not.exist(err2);
+            assert.ok(err2 == null);
 
             User.updateAll({name: 'Simon'}, {$max: {age: 33}}, function(
               err,
               updatedusers,
             ) {
-              should.not.exist(err);
-              updatedusers.should.have.property('count', 1);
+              assert.ok(err == null);
+              assert.strictEqual(updatedusers['count'], 1);
 
               User.updateAll({name: 'Simon'}, {$min: {age: 31}}, function(
                 err,
                 updatedusers,
               ) {
-                should.not.exist(err);
-                updatedusers.should.have.property('count', 1);
+                assert.ok(err == null);
+                assert.strictEqual(updatedusers['count'], 1);
 
                 User.find({where: {name: {$eq: 'Simon'}}}, function(
                   err,
                   foundusers,
                 ) {
-                  should.not.exist(err);
-                  foundusers.length.should.be.equal(1);
-                  foundusers[0].age.should.be.equal(31);
+                  assert.ok(err == null);
+                  assert.strictEqual(foundusers.length, 1);
+                  assert.strictEqual(foundusers[0].age, 31);
 
-                  done();
+                  resolve();
                 });
               });
             });
           },
         );
-      });
+      }));
 
-      it('should be possible to use the $mul operator', function(done) {
+      it('should be possible to use the $mul operator', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           User.updateAll({name: 'Al'}, {$mul: {age: 2}}, function(
             err,
             updatedusers,
           ) {
-            should.not.exist(err);
-            updatedusers.should.have.property('count', 1);
+            assert.ok(err == null);
+            assert.strictEqual(updatedusers['count'], 1);
 
             User.find({where: {name: 'Al'}}, function(err, foundusers) {
-              should.not.exist(err);
-              foundusers.length.should.be.equal(1);
-              foundusers[0].age.should.be.equal(62);
+              assert.ok(err == null);
+              assert.strictEqual(foundusers.length, 1);
+              assert.strictEqual(foundusers[0].age, 62);
 
-              done();
+              resolve();
             });
           });
         });
-      });
+      }));
 
-      it('should be possible to use the $rename operator', function(done) {
+      it('should be possible to use the $rename operator', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           User.updateAll(
             {name: 'Al'},
             {$rename: {name: 'firstname'}},
             function(err, updatedusers) {
-              should.not.exist(err);
-              updatedusers.should.have.property('count', 1);
+              assert.ok(err == null);
+              assert.strictEqual(updatedusers['count'], 1);
 
               User.find({where: {firstname: 'Al'}}, function(
                 err,
                 foundusers,
               ) {
-                should.not.exist(err);
-                foundusers.length.should.be.equal(1);
+                assert.ok(err == null);
+                assert.strictEqual(foundusers.length, 1);
 
-                done();
+                resolve();
               });
             },
           );
         });
-      });
-      it('should be possible to use the $unset operator', function(done) {
+      }));
+      it('should be possible to use the $unset operator', () => new Promise((resolve, reject) => {
         User.dataSource.settings.allowExtendedOperators = true;
         User.create({name: 'Al', age: 31, email: 'al@strongloop'}, function(
           err1,
           createdusers1,
         ) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           User.updateAll({name: 'Al'}, {$unset: {email: ''}}, function(
             err,
             updatedusers,
           ) {
-            should.not.exist(err);
-            updatedusers.should.have.property('count', 1);
+            assert.ok(err == null);
+            assert.strictEqual(updatedusers['count'], 1);
 
             User.find({where: {name: 'Al'}}, function(err, foundusers) {
-              should.not.exist(err);
-              foundusers.length.should.be.equal(1);
-              should.not.exist(foundusers[0].email);
+              assert.ok(err == null);
+              assert.strictEqual(foundusers.length, 1);
+              assert.ok(foundusers[0].email == null);
 
-              done();
+              resolve();
             });
           });
         });
-      });
+      }));
     });
 
     it('should allow extended operators in update data for strict models', function() {
@@ -1585,8 +1614,8 @@ describe('mongodb connector', function() {
           return noteModel.findById(noteId);
         })
         .then(function(foundNote) {
-          foundNote.title.should.equal('setTitle');
-          foundNote.description.should.equal('updated list');
+          assert.strictEqual(foundNote.title, 'setTitle');
+          assert.strictEqual(foundNote.description, 'updated list');
         });
     });
   });
@@ -1598,10 +1627,10 @@ describe('mongodb connector', function() {
       .then(function(result) {
         const createdPost = result[0];
         const created = result[1];
-        created.should.be.true();
-        should.not.exist(createdPost.title);
-        should.not.exist(createdPost.content);
-        createdPost.comments.should.containDeep(['comment1', 'comment2']);
+        assert.strictEqual(created, true);
+        assert.ok(createdPost.title == null);
+        assert.ok(createdPost.content == null);
+        __CONTAIN_FN__(createdPost.comments, ['comment1', 'comment2']);
       });
   });
 
@@ -1612,10 +1641,10 @@ describe('mongodb connector', function() {
       .then(function(result) {
         const createdPost = result[0];
         const created = result[1];
-        created.should.be.true();
-        should.not.exist(createdPost.title);
-        should.not.exist(createdPost.content);
-        createdPost.comments.should.containDeep(['comment1', 'comment2']);
+        assert.strictEqual(created, true);
+        assert.ok(createdPost.title == null);
+        assert.ok(createdPost.content == null);
+        __CONTAIN_FN__(createdPost.comments, ['comment1', 'comment2']);
       });
   });
 
@@ -1629,10 +1658,10 @@ describe('mongodb connector', function() {
       .then(function(result) {
         const foundPost = result[0];
         const created = result[1];
-        created.should.be.false();
-        should.not.exist(foundPost.title);
-        should.not.exist(foundPost.content);
-        foundPost.comments.should.containDeep(['comment1', 'comment2']);
+        assert.strictEqual(created, false);
+        assert.ok(foundPost.title == null);
+        assert.ok(foundPost.content == null);
+        __CONTAIN_FN__(foundPost.comments, ['comment1', 'comment2']);
       });
   });
 
@@ -1646,170 +1675,174 @@ describe('mongodb connector', function() {
       .then(function(result) {
         const foundPost = result[0];
         const created = result[1];
-        created.should.be.false();
-        should.not.exist(foundPost.title);
-        should.not.exist(foundPost.content);
-        foundPost.comments.should.containDeep(['comment1', 'comment2']);
+        assert.strictEqual(created, false);
+        assert.ok(foundPost.title == null);
+        assert.ok(foundPost.content == null);
+        __CONTAIN_FN__(foundPost.comments, ['comment1', 'comment2']);
       });
   });
 
-  it('updateOrCreate should update the instance', function(done) {
+  it('updateOrCreate should update the instance', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       post.title = 'b';
       Post.updateOrCreate(post, function(err, p) {
-        should.not.exist(err);
-        p.id.should.be.equal(post.id);
-        p.content.should.be.equal(post.content);
-        should.not.exist(p._id);
+        assert.ok(err == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.content, post.content);
+        assert.ok(p._id == null);
 
         Post.findById(post.id, function(err, p) {
-          p.id.should.be.eql(post.id);
-          should.not.exist(p._id);
-          p.content.should.be.equal(post.content);
-          p.title.should.be.equal('b');
+          assert.deepStrictEqual(p.id, post.id);
+          assert.ok(p._id == null);
+          assert.strictEqual(p.content, post.content);
+          assert.strictEqual(p.title, 'b');
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('updateAttributes should update the instance', function(done) {
+  it('updateAttributes should update the instance', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       post.updateAttributes({title: 'b'}, function(err, p) {
-        should.not.exist(err);
-        p.id.should.be.equal(post.id);
-        p.title.should.be.equal('b');
+        assert.ok(err == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.title, 'b');
 
         Post.findById(post.id, function(err, p) {
-          p.id.should.be.eql(post.id);
-          p.title.should.be.equal('b');
+          assert.deepStrictEqual(p.id, post.id);
+          assert.strictEqual(p.title, 'b');
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('updateAttributes should not throw an error when no attributes are given', function(done) {
+  it('updateAttributes should not throw an error when no attributes are given', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       post.updateAttributes({}, function(err, p) {
-        should.not.exist(err);
-        p.id.should.be.equal(post.id);
-        p.title.should.be.equal('a');
+        assert.ok(err == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.title, 'a');
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it("updateAttributes: $addToSet should append item to an Array if it doesn't already exist", function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [{'2014-11-11': 90}]},
-      function(err, product) {
-        const newattributes = {
-          $set: {description: 'goes well with butter'},
-          $addToSet: {pricehistory: {'2014-12-12': 110}},
-        };
-        product.updateAttributes(newattributes, function(err1, inst) {
-          should.not.exist(err1);
+  it("updateAttributes: $addToSet should append item to an Array if it doesn't already exist",
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [{'2014-11-11': 90}]},
+        function(err, product) {
+          const newattributes = {
+            $set: {description: 'goes well with butter'},
+            $addToSet: {pricehistory: {'2014-12-12': 110}},
+          };
+          product.updateAttributes(newattributes, function(err1, inst) {
+            assert.ok(err1 == null);
 
-          Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err2);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-            updatedproduct.pricehistory[1]['2014-12-12'].should.be.equal(110);
-            done();
+            Product.findById(product.id, function(err2, updatedproduct) {
+              assert.ok(err2 == null);
+              assert.ok(updatedproduct._id == null);
+              assert.deepStrictEqual(updatedproduct.id, product.id);
+              assert.strictEqual(updatedproduct.name, product.name);
+              assert.strictEqual(updatedproduct.description, 'goes well with butter');
+              assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+              assert.strictEqual(updatedproduct.pricehistory[1]['2014-12-12'], 110);
+              resolve();
+            });
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it("updateOrCreate: $addToSet should append item to an Array if it doesn't already exist", function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [{'2014-11-11': 90}]},
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$addToSet = {pricehistory: {'2014-12-12': 110}};
+  it("updateOrCreate: $addToSet should append item to an Array if it doesn't already exist",
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [{'2014-11-11': 90}]},
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$addToSet = {pricehistory: {'2014-12-12': 110}};
 
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-          updatedproduct.pricehistory[1]['2014-12-12'].should.be.equal(110);
-          done();
-        });
-      },
-    );
-  });
-
-  it('updateOrCreate: $addToSet should not append item to an Array if it does already exist', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {
-        name: 'bread',
-        price: 100,
-        pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
-      },
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$addToSet = {pricehistory: {'2014-10-10': 80}};
-
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-          updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-          done();
-        });
-      },
-    );
-  });
-
-  it('updateAttributes: $addToSet should not append item to an Array if it does already exist', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {
-        name: 'bread',
-        price: 100,
-        pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
-      },
-      function(err, product) {
-        const newattributes = {
-          $set: {description: 'goes well with butter'},
-          $addToSet: {pricehistory: {'2014-12-12': 110}},
-        };
-        product.updateAttributes(newattributes, function(err1, inst) {
-          should.not.exist(err1);
-
-          Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err2);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-            updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-            done();
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+            assert.strictEqual(updatedproduct.pricehistory[1]['2014-12-12'], 110);
+            resolve();
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it('updateAttributes: $pop should remove first or last item from an Array', function(done) {
+  it('updateOrCreate: $addToSet should not append item to an Array if it does already exist',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {
+          name: 'bread',
+          price: 100,
+          pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
+        },
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$addToSet = {pricehistory: {'2014-10-10': 80}};
+
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+            assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+            resolve();
+          });
+        },
+      );
+    }));
+
+  it('updateAttributes: $addToSet should not append item to an Array if it does already exist',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {
+          name: 'bread',
+          price: 100,
+          pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
+        },
+        function(err, product) {
+          const newattributes = {
+            $set: {description: 'goes well with butter'},
+            $addToSet: {pricehistory: {'2014-12-12': 110}},
+          };
+          product.updateAttributes(newattributes, function(err1, inst) {
+            assert.ok(err1 == null);
+
+            Product.findById(product.id, function(err2, updatedproduct) {
+              assert.ok(err2 == null);
+              assert.ok(updatedproduct._id == null);
+              assert.deepStrictEqual(updatedproduct.id, product.id);
+              assert.strictEqual(updatedproduct.name, product.name);
+              assert.strictEqual(updatedproduct.description, 'goes well with butter');
+              assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+              assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+              resolve();
+            });
+          });
+        },
+      );
+    }));
+
+  it('updateAttributes: $pop should remove first or last item from an Array', () => new Promise((resolve, reject) => {
     Product.dataSource.settings.allowExtendedOperators = true;
     Product.create(
       {
@@ -1827,24 +1860,24 @@ describe('mongodb connector', function() {
           $addToSet: {pricehistory: 1},
         };
         product.updateAttributes(newattributes, function(err1, inst) {
-          should.not.exist(err1);
+          assert.ok(err1 == null);
 
           Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err2);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-            updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-            done();
+            assert.ok(err2 == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+            assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+            resolve();
           });
         });
       },
     );
-  });
+  }));
 
-  it('updateOrCreate: $pop should remove first or last item from an Array', function(done) {
+  it('updateOrCreate: $pop should remove first or last item from an Array', () => new Promise((resolve, reject) => {
     Product.dataSource.settings.allowExtendedOperators = true;
     Product.create(
       {
@@ -1861,488 +1894,497 @@ describe('mongodb connector', function() {
         product.$pop = {pricehistory: 1};
 
         Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-          updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
+          assert.ok(err == null);
+          assert.ok(updatedproduct._id == null);
+          assert.deepStrictEqual(updatedproduct.id, product.id);
+          assert.strictEqual(updatedproduct.name, product.name);
+          assert.strictEqual(updatedproduct.description, 'goes well with butter');
+          assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+          assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
 
           updatedproduct.$pop = {pricehistory: -1};
           Product.updateOrCreate(product, function(err, p) {
-            should.not.exist(err);
-            should.not.exist(p._id);
-            updatedproduct.pricehistory[0]['2014-10-10'].should.be.equal(80);
-            done();
+            assert.ok(err == null);
+            assert.ok(p._id == null);
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-10-10'], 80);
+            resolve();
           });
         });
       },
     );
-  });
+  }));
 
-  it('updateAttributes: $pull should remove items from an Array if they match a criteria', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
-      function(err, product) {
-        const newattributes = {
-          $set: {description: 'goes well with butter'},
-          $pull: {pricehistory: {$gte: 90}},
-        };
-        product.updateAttributes(newattributes, function(err1, updatedproduct) {
-          should.not.exist(err1);
-          Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err1);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0].should.be.equal(70);
-            updatedproduct.pricehistory[1].should.be.equal(80);
+  it('updateAttributes: $pull should remove items from an Array if they match a criteria',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
+        function(err, product) {
+          const newattributes = {
+            $set: {description: 'goes well with butter'},
+            $pull: {pricehistory: {$gte: 90}},
+          };
+          product.updateAttributes(newattributes, function(err1, updatedproduct) {
+            assert.ok(err1 == null);
+            Product.findById(product.id, function(err2, updatedproduct) {
+              assert.ok(err1 == null);
+              assert.ok(updatedproduct._id == null);
+              assert.deepStrictEqual(updatedproduct.id, product.id);
+              assert.strictEqual(updatedproduct.name, product.name);
+              assert.strictEqual(updatedproduct.description, 'goes well with butter');
+              assert.strictEqual(updatedproduct.pricehistory[0], 70);
+              assert.strictEqual(updatedproduct.pricehistory[1], 80);
 
-            done();
+              resolve();
+            });
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it('updateOrCreate: $pull should remove items from an Array if they match a criteria', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$pull = {pricehistory: {$gte: 90}};
+  it('updateOrCreate: $pull should remove items from an Array if they match a criteria',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$pull = {pricehistory: {$gte: 90}};
 
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0].should.be.equal(70);
-          updatedproduct.pricehistory[1].should.be.equal(80);
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0], 70);
+            assert.strictEqual(updatedproduct.pricehistory[1], 80);
 
-          done();
-        });
-      },
-    );
-  });
-
-  it('updateAttributes: $pullAll should remove items from an Array if they match a value from a list', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
-      function(err, product) {
-        const newattributes = {
-          $set: {description: 'goes well with butter'},
-          $pullAll: {pricehistory: [80, 100]},
-        };
-        product.updateAttributes(newattributes, function(err1, inst) {
-          should.not.exist(err1);
-
-          Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err2);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0].should.be.equal(70);
-            updatedproduct.pricehistory[1].should.be.equal(90);
-
-            done();
+            resolve();
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it('updateOrCreate: $pullAll should remove items from an Array if they match a value from a list', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$pullAll = {pricehistory: [80, 100]};
+  it('updateAttributes: $pullAll should remove items from an Array if they match a value from a list',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
+        function(err, product) {
+          const newattributes = {
+            $set: {description: 'goes well with butter'},
+            $pullAll: {pricehistory: [80, 100]},
+          };
+          product.updateAttributes(newattributes, function(err1, inst) {
+            assert.ok(err1 == null);
 
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0].should.be.equal(70);
-          updatedproduct.pricehistory[1].should.be.equal(90);
+            Product.findById(product.id, function(err2, updatedproduct) {
+              assert.ok(err2 == null);
+              assert.ok(updatedproduct._id == null);
+              assert.deepStrictEqual(updatedproduct.id, product.id);
+              assert.strictEqual(updatedproduct.name, product.name);
+              assert.strictEqual(updatedproduct.description, 'goes well with butter');
+              assert.strictEqual(updatedproduct.pricehistory[0], 70);
+              assert.strictEqual(updatedproduct.pricehistory[1], 90);
 
-          done();
-        });
-      },
-    );
-  });
-
-  it('updateAttributes: $push should append item to an Array even if it does already exist', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {
-        name: 'bread',
-        price: 100,
-        pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
-      },
-      function(err, product) {
-        const newattributes = {
-          $set: {description: 'goes well with butter'},
-          $push: {pricehistory: {'2014-10-10': 80}},
-        };
-
-        product.updateAttributes(newattributes, function(err1, inst) {
-          should.not.exist(err1);
-
-          Product.findById(product.id, function(err2, updatedproduct) {
-            should.not.exist(err2);
-            should.not.exist(updatedproduct._id);
-            updatedproduct.id.should.be.eql(product.id);
-            updatedproduct.name.should.be.equal(product.name);
-            updatedproduct.description.should.be.equal('goes well with butter');
-            updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-            updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-            updatedproduct.pricehistory[2]['2014-10-10'].should.be.equal(80);
-
-            done();
+              resolve();
+            });
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it('updateOrCreate: $push should append item to an Array even if it does already exist', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {
-        name: 'bread',
-        price: 100,
-        pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
-      },
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$push = {pricehistory: {'2014-10-10': 80}};
+  it('updateOrCreate: $pullAll should remove items from an Array if they match a value from a list',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {name: 'bread', price: 100, pricehistory: [70, 80, 90, 100]},
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$pullAll = {pricehistory: [80, 100]};
 
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-          updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-          updatedproduct.pricehistory[2]['2014-10-10'].should.be.equal(80);
-          done();
-        });
-      },
-    );
-  });
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0], 70);
+            assert.strictEqual(updatedproduct.pricehistory[1], 90);
+
+            resolve();
+          });
+        },
+      );
+    }));
+
+  it('updateAttributes: $push should append item to an Array even if it does already exist',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {
+          name: 'bread',
+          price: 100,
+          pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
+        },
+        function(err, product) {
+          const newattributes = {
+            $set: {description: 'goes well with butter'},
+            $push: {pricehistory: {'2014-10-10': 80}},
+          };
+
+          product.updateAttributes(newattributes, function(err1, inst) {
+            assert.ok(err1 == null);
+
+            Product.findById(product.id, function(err2, updatedproduct) {
+              assert.ok(err2 == null);
+              assert.ok(updatedproduct._id == null);
+              assert.deepStrictEqual(updatedproduct.id, product.id);
+              assert.strictEqual(updatedproduct.name, product.name);
+              assert.strictEqual(updatedproduct.description, 'goes well with butter');
+              assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+              assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+              assert.strictEqual(updatedproduct.pricehistory[2]['2014-10-10'], 80);
+
+              resolve();
+            });
+          });
+        },
+      );
+    }));
+
+  it('updateOrCreate: $push should append item to an Array even if it does already exist',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {
+          name: 'bread',
+          price: 100,
+          pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
+        },
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$push = {pricehistory: {'2014-10-10': 80}};
+
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+            assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+            assert.strictEqual(updatedproduct.pricehistory[2]['2014-10-10'], 80);
+            resolve();
+          });
+        },
+      );
+    }));
 
   describe('replaceById', function() {
-    it('should replace the object with given data', function(done) {
+    it('should replace the object with given data', () => new Promise((resolve, reject) => {
       Product.create({name: 'beer', price: 150}, function(err, product) {
-        if (err) return done(err);
+        if (err) return reject(err);
         replaceById(product.id, {name: 'milk'});
       });
 
       function replaceById(id, data) {
         Product.replaceById(id, data, function(err, updatedProduct) {
-          if (err) return done(err);
-          should.not.exist(updatedProduct._id);
-          updatedProduct.name.should.be.equal('milk');
-          should.exist(updatedProduct.id);
+          if (err) return reject(err);
+          assert.ok(updatedProduct._id == null);
+          assert.strictEqual(updatedProduct.name, 'milk');
+          assert.ok(updatedProduct.id != null);
           verify(id);
         });
       }
 
       function verify(id) {
         Product.findById(id, function(err, data) {
-          data.name.should.be.equal('milk');
-          should.not.exist(data.price);
-          done(err);
+          assert.strictEqual(data.name, 'milk');
+          assert.ok(data.price == null);
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
   });
 
   describe('replaceOrCreate', function() {
-    it('should create a model instance even if it already exists', function(done) {
+    it('should create a model instance even if it already exists', () => new Promise((resolve, reject) => {
       Product.replaceOrCreate({name: 'newFoo'}, function(
         err,
         updatedProduct,
       ) {
-        if (err) return done(err);
-        should.not.exist(updatedProduct._id);
-        should.exist(updatedProduct.id);
+        if (err) return reject(err);
+        assert.ok(updatedProduct._id == null);
+        assert.ok(updatedProduct.id != null);
         verifyData(updatedProduct.id);
       });
       function verifyData(id) {
         Product.findById(id, function(err, data) {
-          data.name.should.be.equal('newFoo');
-          done(err);
+          assert.strictEqual(data.name, 'newFoo');
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
 
-    it('should replace a model instance if the passing key already exists', function(done) {
+    it('should replace a model instance if the passing key already exists', () => new Promise((resolve, reject) => {
       Product.create({name: 'bread', price: 100}, function(err, product) {
-        if (err) return done(err);
+        if (err) return reject(err);
         replaceOrCreate({id: product.id, name: 'milk'});
       });
       function replaceOrCreate(data) {
         Product.replaceOrCreate(data, function(err, updatedProduct) {
-          if (err) return done(err);
-          should.not.exist(updatedProduct._id);
-          updatedProduct.name.should.be.equal('milk');
-          should.exist(updatedProduct.id);
+          if (err) return reject(err);
+          assert.ok(updatedProduct._id == null);
+          assert.strictEqual(updatedProduct.name, 'milk');
+          assert.ok(updatedProduct.id != null);
           verify(data.id);
         });
       }
       function verify(id) {
         Product.findById(id, function(err, data) {
-          data.name.should.be.equal('milk');
-          should.not.exist(data.price);
-          done(err);
+          assert.strictEqual(data.name, 'milk');
+          assert.ok(data.price == null);
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
 
-    it('should remove extraneous properties that are not defined in the model', function(done) {
+    it('should remove extraneous properties that are not defined in the model', () => new Promise((resolve, reject) => {
       Product.create({name: 'bread', price: 100, bar: 'baz'}, function(
         err,
         product,
       ) {
-        if (err) return done(err);
+        if (err) return reject(err);
         replaceOrCreate({id: product.id, name: 'milk'});
       });
       function replaceOrCreate(data) {
         Product.replaceOrCreate(data, function(err, updatedProduct) {
-          if (err) return done(err);
-          should.not.exist(updatedProduct.bar);
+          if (err) return reject(err);
+          assert.ok(updatedProduct.bar == null);
           verify(data.id);
         });
       }
       function verify(id) {
         Product.findById(id, function(err, data) {
-          should.not.exist(data.bar);
-          done(err);
+          assert.ok(data.bar == null);
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
   });
 
   describe('replace', function() {
-    it('should replace the model instance if the provided key already exists', function(done) {
+    it('should replace the model instance if the provided key already exists', () => new Promise((resolve, reject) => {
       Product.create({name: 'bread', price: 100}, function(err, product) {
-        if (err) return done(err);
+        if (err) return reject(err);
         replace(product, {name: 'milk'}, product.id);
       });
       function replace(product, data, id) {
         product.replaceAttributes(data, function(err, updatedProduct) {
-          if (err) return done(err);
-          should.not.exist(updatedProduct._id);
-          updatedProduct.name.should.be.equal('milk');
-          should.exist(updatedProduct.id);
+          if (err) return reject(err);
+          assert.ok(updatedProduct._id == null);
+          assert.strictEqual(updatedProduct.name, 'milk');
+          assert.ok(updatedProduct.id != null);
           verify(id);
         });
       }
       function verify(id) {
         Product.findById(id, function(err, data) {
-          data.name.should.be.equal('milk');
-          should.not.exist(data.price);
-          done(err);
+          assert.strictEqual(data.name, 'milk');
+          assert.ok(data.price == null);
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
 
-    it('should remove extraneous properties that are not defined in the model', function(done) {
+    it('should remove extraneous properties that are not defined in the model', () => new Promise((resolve, reject) => {
       Product.create({name: 'bread', price: 100, bar: 'baz'}, function(
         err,
         product,
       ) {
-        if (err) return done(err);
+        if (err) return reject(err);
         replace(product, {name: 'milk'}, product.id);
       });
       function replace(product, data, id) {
         product.replaceAttributes(data, function(err, updatedProduct) {
-          if (err) return done(err);
-          should.not.exist(updatedProduct.bar);
+          if (err) return reject(err);
+          assert.ok(updatedProduct.bar == null);
           verify(id);
         });
       }
       function verify(id) {
         Product.findById(id, function(err, data) {
-          data.name.should.be.equal('milk');
-          should.not.exist(data.bar);
-          done(err);
+          assert.strictEqual(data.name, 'milk');
+          assert.ok(data.bar == null);
+          if (err) reject(err); else resolve();
         });
       }
-    });
+    }));
   });
 
-  it('updateOrCreate: should handle combination of operators and top level properties without errors', function(done) {
-    Product.dataSource.settings.allowExtendedOperators = true;
-    Product.create(
-      {
-        name: 'bread',
-        price: 100,
-        ingredients: ['flour'],
-        pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
-      },
-      function(err, product) {
-        product.$set = {description: 'goes well with butter'};
-        product.$push = {ingredients: 'water'};
-        product.$addToSet = {pricehistory: {'2014-09-09': 70}};
-        product.description = 'alternative description';
-        Product.updateOrCreate(product, function(err, updatedproduct) {
-          should.not.exist(err);
-          should.not.exist(updatedproduct._id);
-          updatedproduct.id.should.be.eql(product.id);
-          updatedproduct.name.should.be.equal(product.name);
-          updatedproduct.description.should.be.equal('goes well with butter');
-          updatedproduct.ingredients[0].should.be.equal('flour');
-          updatedproduct.ingredients[1].should.be.equal('water');
-          updatedproduct.pricehistory[0]['2014-11-11'].should.be.equal(90);
-          updatedproduct.pricehistory[1]['2014-10-10'].should.be.equal(80);
-          updatedproduct.pricehistory[2]['2014-09-09'].should.be.equal(70);
+  it('updateOrCreate: should handle combination of operators and top level properties without errors',
+    () => new Promise((resolve, reject) => {
+      Product.dataSource.settings.allowExtendedOperators = true;
+      Product.create(
+        {
+          name: 'bread',
+          price: 100,
+          ingredients: ['flour'],
+          pricehistory: [{'2014-11-11': 90}, {'2014-10-10': 80}],
+        },
+        function(err, product) {
+          product.$set = {description: 'goes well with butter'};
+          product.$push = {ingredients: 'water'};
+          product.$addToSet = {pricehistory: {'2014-09-09': 70}};
+          product.description = 'alternative description';
+          Product.updateOrCreate(product, function(err, updatedproduct) {
+            assert.ok(err == null);
+            assert.ok(updatedproduct._id == null);
+            assert.deepStrictEqual(updatedproduct.id, product.id);
+            assert.strictEqual(updatedproduct.name, product.name);
+            assert.strictEqual(updatedproduct.description, 'goes well with butter');
+            assert.strictEqual(updatedproduct.ingredients[0], 'flour');
+            assert.strictEqual(updatedproduct.ingredients[1], 'water');
+            assert.strictEqual(updatedproduct.pricehistory[0]['2014-11-11'], 90);
+            assert.strictEqual(updatedproduct.pricehistory[1]['2014-10-10'], 80);
+            assert.strictEqual(updatedproduct.pricehistory[2]['2014-09-09'], 70);
 
-          done();
-        });
-      },
-    );
-  });
-
-  it('updateOrCreate should update the instance without removing existing properties', function(done) {
-    Post.create(
-      {title: 'a', content: 'AAA', comments: ['Comment1']},
-      function(err, post) {
-        post = post.toObject();
-        delete post.title;
-        delete post.comments;
-        Post.updateOrCreate(post, function(err, p) {
-          should.not.exist(err);
-          p.id.should.be.equal(post.id);
-          p.content.should.be.equal(post.content);
-          should.not.exist(p._id);
-
-          Post.findById(post.id, function(err, p) {
-            p.id.should.be.eql(post.id);
-            should.not.exist(p._id);
-            p.content.should.be.equal(post.content);
-            p.title.should.be.equal('a');
-            p.comments[0].should.be.equal('Comment1');
-
-            done();
+            resolve();
           });
-        });
-      },
-    );
-  });
+        },
+      );
+    }));
 
-  it('updateOrCreate should create a new instance if it does not exist', function(done) {
+  it('updateOrCreate should update the instance without removing existing properties',
+    () => new Promise((resolve, reject) => {
+      Post.create(
+        {title: 'a', content: 'AAA', comments: ['Comment1']},
+        function(err, post) {
+          post = post.toObject();
+          delete post.title;
+          delete post.comments;
+          Post.updateOrCreate(post, function(err, p) {
+            assert.ok(err == null);
+            assert.strictEqual(p.id, post.id);
+            assert.strictEqual(p.content, post.content);
+            assert.ok(p._id == null);
+
+            Post.findById(post.id, function(err, p) {
+              assert.deepStrictEqual(p.id, post.id);
+              assert.ok(p._id == null);
+              assert.strictEqual(p.content, post.content);
+              assert.strictEqual(p.title, 'a');
+              assert.strictEqual(p.comments[0], 'Comment1');
+
+              resolve();
+            });
+          });
+        },
+      );
+    }));
+
+  it('updateOrCreate should create a new instance if it does not exist', () => new Promise((resolve, reject) => {
     const post = {id: '123', title: 'a', content: 'AAA'};
     Post.updateOrCreate(post, function(err, p) {
-      should.not.exist(err);
-      p.title.should.be.equal(post.title);
-      p.content.should.be.equal(post.content);
-      p.id.should.be.eql(post.id);
+      assert.ok(err == null);
+      assert.strictEqual(p.title, post.title);
+      assert.strictEqual(p.content, post.content);
+      assert.deepStrictEqual(p.id, post.id);
 
       Post.findById(p.id, function(err, p) {
-        p.id.should.be.equal(post.id);
-        should.not.exist(p._id);
-        p.content.should.be.equal(post.content);
-        p.title.should.be.equal(post.title);
-        p.id.should.be.equal(post.id);
+        assert.strictEqual(p.id, post.id);
+        assert.ok(p._id == null);
+        assert.strictEqual(p.content, post.content);
+        assert.strictEqual(p.title, post.title);
+        assert.strictEqual(p.id, post.id);
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('save should update the instance with the same id', function(done) {
+  it('save should update the instance with the same id', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       post.title = 'b';
       post.save(function(err, p) {
-        should.not.exist(err);
-        p.id.should.be.equal(post.id);
-        p.content.should.be.equal(post.content);
-        should.not.exist(p._id);
+        assert.ok(err == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.content, post.content);
+        assert.ok(p._id == null);
 
         Post.findById(post.id, function(err, p) {
-          p.id.should.be.eql(post.id);
-          should.not.exist(p._id);
-          p.content.should.be.equal(post.content);
-          p.title.should.be.equal('b');
+          assert.deepStrictEqual(p.id, post.id);
+          assert.ok(p._id == null);
+          assert.strictEqual(p.content, post.content);
+          assert.strictEqual(p.title, 'b');
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('save should update the instance without removing existing properties', function(done) {
+  it('save should update the instance without removing existing properties', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       delete post.title;
       post.save(function(err, p) {
-        should.not.exist(err);
-        p.id.should.be.equal(post.id);
-        p.content.should.be.equal(post.content);
-        should.not.exist(p._id);
+        assert.ok(err == null);
+        assert.strictEqual(p.id, post.id);
+        assert.strictEqual(p.content, post.content);
+        assert.ok(p._id == null);
 
         Post.findById(post.id, function(err, p) {
-          p.id.should.be.eql(post.id);
-          should.not.exist(p._id);
-          p.content.should.be.equal(post.content);
-          p.title.should.be.equal('a');
+          assert.deepStrictEqual(p.id, post.id);
+          assert.ok(p._id == null);
+          assert.strictEqual(p.content, post.content);
+          assert.strictEqual(p.title, 'a');
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('save should create a new instance if it does not exist', function(done) {
+  it('save should create a new instance if it does not exist', () => new Promise((resolve, reject) => {
     const post = new Post({id: '123', title: 'a', content: 'AAA'});
     post.save(post, function(err, p) {
-      should.not.exist(err);
-      p.title.should.be.equal(post.title);
-      p.content.should.be.equal(post.content);
-      p.id.should.be.equal(post.id);
+      assert.ok(err == null);
+      assert.strictEqual(p.title, post.title);
+      assert.strictEqual(p.content, post.content);
+      assert.strictEqual(p.id, post.id);
 
       Post.findById(p.id, function(err, p) {
-        p.id.should.be.equal(post.id);
-        should.not.exist(p._id);
-        p.content.should.be.equal(post.content);
-        p.title.should.be.equal(post.title);
-        p.id.should.be.equal(post.id);
+        assert.strictEqual(p.id, post.id);
+        assert.ok(p._id == null);
+        assert.strictEqual(p.content, post.content);
+        assert.strictEqual(p.title, post.title);
+        assert.strictEqual(p.id, post.id);
 
-        done();
+        resolve();
       });
     });
-  });
-  it('all should return object with an id, which is instanceof ObjectID, but not mongodb _id', function(done) {
-    const post = new Post({title: 'a', content: 'AAA'});
-    post.save(function(err, post) {
-      Post.all({where: {title: 'a'}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.lengthOf(1);
-        post = posts[0];
-        post.should.have.property('title', 'a');
-        post.should.have.property('content', 'AAA');
-        post.id.should.be.an.instanceOf(db.ObjectID);
-        should.not.exist(post._id);
+  }));
+  it('all should return object with an id, which is instanceof ObjectID, but not mongodb _id',
+    () => new Promise((resolve, reject) => {
+      const post = new Post({title: 'a', content: 'AAA'});
+      post.save(function(err, post) {
+        Post.all({where: {title: 'a'}}, function(err, posts) {
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
+          post = posts[0];
+          assert.strictEqual(post['title'], 'a');
+          assert.strictEqual(post['content'], 'AAA');
+          assert.ok(post.id instanceof db.ObjectID);
+          assert.ok(post._id == null);
 
-        done();
+          resolve();
+        });
       });
-    });
-  });
+    }));
 
-  it('all return should honor filter.fields', function(done) {
+  it('all return should honor filter.fields', () => new Promise((resolve, reject) => {
     const post = new Post({title: 'b', content: 'BBB'});
     post.save(function(err, post) {
       db.connector.all(
@@ -2350,21 +2392,21 @@ describe('mongodb connector', function() {
         {fields: ['title'], where: {title: 'b'}},
         {},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.lengthOf(1);
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
           post = posts[0];
-          post.should.have.property('title', 'b');
-          should.not.exist(post.content);
-          should.not.exist(post._id);
-          should.not.exist(post.id);
+          assert.strictEqual(post['title'], 'b');
+          assert.ok(post.content == null);
+          assert.ok(post._id == null);
+          assert.ok(post.id == null);
 
-          done();
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should allow to use filters with customized field names', function(done) {
+  it('should allow to use filters with customized field names', () => new Promise((resolve, reject) => {
     const post = new PostWithStringIdAndRenamedColumns({renamedTitle: 'b', renamedContent: 'BBB'});
     post.save(function(err, post) {
       db.connector.all(
@@ -2372,21 +2414,21 @@ describe('mongodb connector', function() {
         {fields: ['renamedTitle', 'renamedContent']},
         {},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.lengthOf(1);
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 1);
           post = posts[0];
-          post.should.have.property('renamedTitle', 'b');
-          post.should.have.property('renamedContent', 'BBB');
-          should.not.exist(post.content);
-          should.not.exist(post._id);
-          should.not.exist(post.id);
-          done();
+          assert.strictEqual(post['renamedTitle'], 'b');
+          assert.strictEqual(post['renamedContent'], 'BBB');
+          assert.ok(post.content == null);
+          assert.ok(post._id == null);
+          assert.ok(post.id == null);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('create should convert id from ObjectID to string', function(done) {
+  it('create should convert id from ObjectID to string', () => new Promise((resolve, reject) => {
     const oid = new db.ObjectID();
     const sid = oid.toString();
     PostWithStringId.create({id: oid, title: 'c', content: 'CCC'}, function(
@@ -2394,74 +2436,75 @@ describe('mongodb connector', function() {
       post,
     ) {
       PostWithStringId.findById(oid, function(err, post) {
-        should.not.exist(err);
-        should.not.exist(post._id);
-        post.id.should.be.a.String();
-        post.id.should.be.equal(sid);
+        assert.ok(err == null);
+        assert.ok(post._id == null);
+        assert.strictEqual(typeof post.id, 'string');
+        assert.strictEqual(post.id, sid);
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('create should convert id from string to ObjectID', function(done) {
+  it('create should convert id from string to ObjectID', () => new Promise((resolve, reject) => {
     const oid = new db.ObjectID();
     const sid = oid.toString();
     Post.create({id: sid, title: 'c', content: 'CCC'}, function(err, post) {
-      post.id.should.be.an.instanceOf(db.ObjectID);
+      assert.ok(post.id instanceof db.ObjectID);
       Post.findById(sid, function(err, post) {
-        should.not.exist(err);
-        should.not.exist(post._id);
-        post.id.should.be.an.instanceOf(db.ObjectID);
-        post.id.should.be.eql(oid);
+        assert.ok(err == null);
+        assert.ok(post._id == null);
+        assert.ok(post.id instanceof db.ObjectID);
+        assert.deepStrictEqual(post.id, oid);
 
-        done();
+        resolve();
       });
     });
-  });
+  }));
 
-  it('create should convert id from string to ObjectID - Array property', function(done) {
+  it('create should convert id from string to ObjectID - Array property', () => new Promise((resolve, reject) => {
     Post.create({title: 'c', content: 'CCC'}, function(err, post) {
       Category.create({title: 'a', posts: [String(post.id)]}, function(
         err,
         category,
       ) {
-        category.id.should.be.an.instanceOf(db.ObjectID);
-        category.posts[0].should.be.an.instanceOf(db.ObjectID);
+        assert.ok(category.id instanceof db.ObjectID);
+        assert.ok(category.posts[0] instanceof db.ObjectID);
         Category.findOne({where: {posts: post.id}}, function(err, c) {
-          should.not.exist(err);
-          c.id.should.be.an.instanceOf(db.ObjectID);
-          c.posts[0].should.be.an.instanceOf(db.ObjectID);
-          c.id.should.be.eql(category.id);
+          assert.ok(err == null);
+          assert.ok(c.id instanceof db.ObjectID);
+          assert.ok(c.posts[0] instanceof db.ObjectID);
+          assert.deepStrictEqual(c.id, category.id);
 
-          done();
+          resolve();
         });
       });
     });
-  });
+  }));
 
-  it('create should support renamed column names (using property syntax first)', function(done) {
-    const oid = new db.ObjectID().toString();
-    PostWithStringId.create({id: oid, title: 'c', content: 'CCC'}, function(
-      err,
-      post,
-    ) {
-      PostWithStringIdAndRenamedColumns.findById(oid, function(err, post) {
-        should.not.exist(err);
-        should.not.exist(post._id);
-        post.id.should.be.equal(oid);
+  it('create should support renamed column names (using property syntax first)',
+    () => new Promise((resolve, reject) => {
+      const oid = new db.ObjectID().toString();
+      PostWithStringId.create({id: oid, title: 'c', content: 'CCC'}, function(
+        err,
+        post,
+      ) {
+        PostWithStringIdAndRenamedColumns.findById(oid, function(err, post) {
+          assert.ok(err == null);
+          assert.ok(post._id == null);
+          assert.strictEqual(post.id, oid);
 
-        should.exist(post.renamedTitle);
-        should.exist(post.renamedContent);
-        post.renamedTitle.should.be.equal('c');
-        post.renamedContent.should.be.equal('CCC');
+          assert.ok(post.renamedTitle != null);
+          assert.ok(post.renamedContent != null);
+          assert.strictEqual(post.renamedTitle, 'c');
+          assert.strictEqual(post.renamedContent, 'CCC');
 
-        done();
+          resolve();
+        });
       });
-    });
-  });
+    }));
 
-  it('should get rejected if the id property has a custom field name', function(done) {
+  it('should get rejected if the id property has a custom field name', () => new Promise((resolve, reject) => {
     const oid = new db.ObjectID().toString();
     try {
       WithInvalidCustomIdFieldName.create({id: oid, content: 'should be rejected'}
@@ -2469,15 +2512,17 @@ describe('mongodb connector', function() {
           err,
           post,
         ) {
-          should.exist(err);
+          assert.ok(err != null);
         });
     } catch (e) {
-      e.message.should.match('custom id field name \'rejected\' is not allowed in model WithInvalidCustomIdFieldName');
+      assert.ok(String(e.message).includes(
+        "custom id field name 'rejected' is not allowed in model WithInvalidCustomIdFieldName",
+      ));
     }
-    done();
-  });
+    resolve();
+  }));
 
-  it('create should support renamed column names (using db syntax first)', function(done) {
+  it('create should support renamed column names (using db syntax first)', () => new Promise((resolve, reject) => {
     const oid = new db.ObjectID().toString();
     PostWithStringIdAndRenamedColumns.create(
       {
@@ -2487,20 +2532,20 @@ describe('mongodb connector', function() {
       },
       function(err, post) {
         PostWithStringId.findById(oid, function(err, post) {
-          should.not.exist(err);
-          should.not.exist(post._id);
-          post.id.should.be.equal(oid);
+          assert.ok(err == null);
+          assert.ok(post._id == null);
+          assert.strictEqual(post.id, oid);
 
-          should.exist(post.title);
-          should.exist(post.content);
-          post.title.should.be.equal('c');
-          post.content.should.be.equal('CCC');
+          assert.ok(post.title != null);
+          assert.ok(post.content != null);
+          assert.strictEqual(post.title, 'c');
+          assert.strictEqual(post.content, 'CCC');
 
-          done();
+          resolve();
         });
       },
     );
-  });
+  }));
 
   describe('geo queries', function() {
     let geoDb, PostWithLocation, createLocationPost;
@@ -2534,75 +2579,75 @@ describe('mongodb connector', function() {
       };
     });
 
-    beforeEach(function(done) {
-      PostWithLocation.destroyAll(done);
-    });
+    beforeEach(() => new Promise((resolve, reject) => {
+      PostWithLocation.destroyAll((err) => err ? reject(err) : resolve());
+    }));
 
-    it('create should convert geopoint to geojson', function(done) {
+    it('create should convert geopoint to geojson', () => new Promise((resolve, reject) => {
       const point = new GeoPoint({lat: 1.243, lng: 20.4});
 
       PostWithLocation.create({location: point}, function(err, post) {
-        should.not.exist(err);
-        point.lat.should.be.equal(post.location.lat);
-        point.lng.should.be.equal(post.location.lng);
+        assert.ok(err == null);
+        assert.strictEqual(point.lat, post.location.lat);
+        assert.strictEqual(point.lng, post.location.lng);
 
-        done();
+        resolve();
       });
-    });
+    }));
 
-    it('updateOrCreate should convert geopoint to geojson', function(done) {
+    it('updateOrCreate should convert geopoint to geojson', () => new Promise((resolve, reject) => {
       const point = new GeoPoint({lat: 1.243, lng: 20.4});
       const newPoint = new GeoPoint({lat: 1.2431, lng: 20.41});
 
       PostWithLocation.create({location: point}, function(err, post) {
-        should.not.exist(err);
-        point.lat.should.be.equal(post.location.lat);
-        point.lng.should.be.equal(post.location.lng);
+        assert.ok(err == null);
+        assert.strictEqual(point.lat, post.location.lat);
+        assert.strictEqual(point.lng, post.location.lng);
 
         post.location = newPoint;
 
         PostWithLocation.updateOrCreate(post, function(err, p) {
-          should.not.exist(err);
-          p._id.should.be.equal(post._id);
+          assert.ok(err == null);
+          assert.strictEqual(p._id, post._id);
 
           PostWithLocation.findById(post._id, function(err, p2) {
-            should.not.exist(err);
-            p2._id.should.be.eql(post._id);
-            p2.location.lat.should.be.equal(newPoint.lat);
-            p2.location.lng.should.be.equal(newPoint.lng);
-            done();
+            assert.ok(err == null);
+            assert.deepStrictEqual(p2._id, post._id);
+            assert.strictEqual(p2.location.lat, newPoint.lat);
+            assert.strictEqual(p2.location.lng, newPoint.lng);
+            resolve();
           });
         });
       });
-    });
+    }));
 
-    it('replaceById should convert geopoint to geojson', function(done) {
+    it('replaceById should convert geopoint to geojson', () => new Promise((resolve, reject) => {
       const point = new GeoPoint({lat: 1.243, lng: 20.4});
       const newPoint = new GeoPoint({lat: 1.2431, lng: 20.41});
 
       PostWithLocation.create({location: point}, function(err, post) {
-        should.not.exist(err);
-        point.lat.should.be.equal(post.location.lat);
-        point.lng.should.be.equal(post.location.lng);
+        assert.ok(err == null);
+        assert.strictEqual(point.lat, post.location.lat);
+        assert.strictEqual(point.lng, post.location.lng);
 
         post.location = newPoint;
 
         PostWithLocation.replaceById(post._id, post, function(err, p) {
-          should.not.exist(err);
-          p._id.should.be.equal(post._id);
+          assert.ok(err == null);
+          assert.strictEqual(p._id, post._id);
 
           PostWithLocation.findById(post._id, function(err, p) {
-            should.not.exist(err);
-            p._id.should.be.eql(post._id);
-            p.location.lat.should.be.equal(newPoint.lat);
-            p.location.lng.should.be.equal(newPoint.lng);
-            done();
+            assert.ok(err == null);
+            assert.deepStrictEqual(p._id, post._id);
+            assert.strictEqual(p.location.lat, newPoint.lat);
+            assert.strictEqual(p.location.lng, newPoint.lng);
+            resolve();
           });
         });
       });
-    });
+    }));
 
-    it('find should be able to query by location', function(done) {
+    it('find should be able to query by location', () => new Promise((resolve, reject) => {
       const coords = {lat: 1.25, lng: 20.2};
 
       geoDb.autoupdate(function(err) {
@@ -2615,47 +2660,72 @@ describe('mongodb connector', function() {
           PostWithLocation.create({location: point}, callback);
         };
 
-        async.parallel(
-          [
-            createPost.bind(null),
-            createPost.bind(null),
-            createPost.bind(null),
-            createPost.bind(null),
-          ],
-          function(err) {
-            should.not.exist(err);
+        Promise.all([
+          new Promise((res, rej) => (createPost.bind(null))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createPost.bind(null))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createPost.bind(null))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createPost.bind(null))((err) => err ? rej(err) : res())),
+        ]).then(() => (function(err) {
+          assert.ok(err == null);
 
-            PostWithLocation.find(
-              {
-                where: {
-                  location: {
-                    near: new GeoPoint(coords),
-                  },
+          PostWithLocation.find(
+            {
+              where: {
+                location: {
+                  near: new GeoPoint(coords),
                 },
               },
-              function(err, results) {
-                should.not.exist(err);
-                should.exist(results);
+            },
+            function(err, results) {
+              assert.ok(err == null);
+              assert.ok(results != null);
 
-                let dist = 0;
-                results.forEach(function(result) {
-                  const currentDist = testUtils.getDistanceBetweenPoints(
-                    coords,
-                    result.location,
-                  );
-                  currentDist.should.be.aboveOrEqual(dist);
-                  dist = currentDist;
-                });
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(
+                  coords,
+                  result.location,
+                );
+                assert.ok(currentDist >= dist);
+                dist = currentDist;
+              });
 
-                done();
+              resolve();
+            },
+          );
+        })(null), (err) => (function(err) {
+          assert.ok(err == null);
+
+          PostWithLocation.find(
+            {
+              where: {
+                location: {
+                  near: new GeoPoint(coords),
+                },
               },
-            );
-          },
-        );
-      });
-    });
+            },
+            function(err, results) {
+              assert.ok(err == null);
+              assert.ok(results != null);
 
-    it('find should be queryable using locations with deep/multiple keys', function(done) {
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(
+                  coords,
+                  result.location,
+                );
+                assert.ok(currentDist >= dist);
+                dist = currentDist;
+              });
+
+              resolve();
+            },
+          );
+        })(err));
+      });
+    }));
+
+    it('find should be queryable using locations with deep/multiple keys', () => new Promise((resolve, reject) => {
       const coords = {lat: 1.25, lng: 20.2};
 
       geoDb.autoupdate(function(err) {
@@ -2681,110 +2751,168 @@ describe('mongodb connector', function() {
           );
         }
 
-        async.parallel(
-          [
-            createSuperheroWithLocation,
-            createSuperheroWithLocation,
-            createSuperheroWithLocation,
-          ],
-          function(err) {
-            if (err) return done(err);
+        Promise.all([
+          new Promise((res, rej) => (createSuperheroWithLocation)((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createSuperheroWithLocation)((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createSuperheroWithLocation)((err) => err ? rej(err) : res())),
+        ]).then(() => (function(err) {
+          if (err) return reject(err);
 
-            Superhero.find(
-              {
-                where: {
-                  and: [
-                    {
-                      'location.geometry': {
-                        near: [coords.lng, coords.lat],
-                        maxDistance: 50,
-                      },
+          Superhero.find(
+            {
+              where: {
+                and: [
+                  {
+                    'location.geometry': {
+                      near: [coords.lng, coords.lat],
+                      maxDistance: 50,
                     },
-                    {
-                      power: 'strength',
-                    },
-                  ],
-                },
-              },
-              function(err, results) {
-                if (err) return done(err);
-
-                results.should.have.length(1);
-
-                let dist = 0;
-                results.forEach(function(result) {
-                  const currentDist = testUtils.getDistanceBetweenPoints(coords, {
-                    lng: result.location.geometry.coordinates[0],
-                    lat: result.location.geometry.coordinates[1],
-                  });
-                  currentDist.should.be.aboveOrEqual(dist);
-                  dist = currentDist;
-                });
-
-                done();
-              },
-            );
-          },
-        );
-      });
-    });
-
-    it('find should be able to query by location via near with maxDistance', function(done) {
-      const coords = {lat: 30.274085, lng: 120.15507000000002};
-
-      geoDb.autoupdate(function(err) {
-        async.parallel(
-          [
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(true),
-          ],
-          function(err) {
-            if (err) return done(err);
-            PostWithLocation.find(
-              {
-                where: {
-                  location: {
-                    near: new GeoPoint(coords),
-                    maxDistance: 17000,
-                    unit: 'meters',
                   },
+                  {
+                    power: 'strength',
+                  },
+                ],
+              },
+            },
+            function(err, results) {
+              if (err) return reject(err);
+
+              assert.strictEqual(results.length, 1);
+
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(coords, {
+                  lng: result.location.geometry.coordinates[0],
+                  lat: result.location.geometry.coordinates[1],
+                });
+                assert.ok(currentDist >= dist);
+                dist = currentDist;
+              });
+
+              resolve();
+            },
+          );
+        })(null), (err) => (function(err) {
+          if (err) return reject(err);
+
+          Superhero.find(
+            {
+              where: {
+                and: [
+                  {
+                    'location.geometry': {
+                      near: [coords.lng, coords.lat],
+                      maxDistance: 50,
+                    },
+                  },
+                  {
+                    power: 'strength',
+                  },
+                ],
+              },
+            },
+            function(err, results) {
+              if (err) return reject(err);
+
+              assert.strictEqual(results.length, 1);
+
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(coords, {
+                  lng: result.location.geometry.coordinates[0],
+                  lat: result.location.geometry.coordinates[1],
+                });
+                assert.ok(currentDist >= dist);
+                dist = currentDist;
+              });
+
+              resolve();
+            },
+          );
+        })(err));
+      });
+    }));
+
+    it('find should be able to query by location via near with maxDistance', () => new Promise((resolve, reject) => {
+      const coords = {lat: 30.274085, lng: 120.15507000000002};
+
+      geoDb.autoupdate(function(err) {
+        Promise.all([
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(true))((err) => err ? rej(err) : res())),
+        ]).then(() => (function(err) {
+          if (err) return reject(err);
+          PostWithLocation.find(
+            {
+              where: {
+                location: {
+                  near: new GeoPoint(coords),
+                  maxDistance: 17000,
+                  unit: 'meters',
                 },
               },
-              function(err, results) {
-                if (err) return done(err);
-                results.length.should.be.equal(3);
-                let dist = 0;
-                results.forEach(function(result) {
-                  const currentDist = testUtils.getDistanceBetweenPoints(
-                    coords,
-                    result.location,
-                  );
-                  currentDist.should.be.aboveOrEqual(dist);
-                  currentDist.should.be.belowOrEqual(17);
-                  dist = currentDist;
-                });
-                done();
+            },
+            function(err, results) {
+              if (err) return reject(err);
+              assert.strictEqual(results.length, 3);
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(
+                  coords,
+                  result.location,
+                );
+                assert.ok(currentDist >= dist);
+                assert.ok(currentDist <= 17);
+                dist = currentDist;
+              });
+              resolve();
+            },
+          );
+        })(null), (err) => (function(err) {
+          if (err) return reject(err);
+          PostWithLocation.find(
+            {
+              where: {
+                location: {
+                  near: new GeoPoint(coords),
+                  maxDistance: 17000,
+                  unit: 'meters',
+                },
               },
-            );
-          },
-        );
+            },
+            function(err, results) {
+              if (err) return reject(err);
+              assert.strictEqual(results.length, 3);
+              let dist = 0;
+              results.forEach(function(result) {
+                const currentDist = testUtils.getDistanceBetweenPoints(
+                  coords,
+                  result.location,
+                );
+                assert.ok(currentDist >= dist);
+                assert.ok(currentDist <= 17);
+                dist = currentDist;
+              });
+              resolve();
+            },
+          );
+        })(err));
       });
-    });
+    }));
 
-    it('find should be able to query by location via near with minDistance set', function(done) {
-      const coords = {lat: 30.274085, lng: 120.15507000000002};
-      geoDb.autoupdate(function(err) {
-        async.parallel(
-          [
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(true),
-          ],
-          function(err) {
-            if (err) return done(err);
+    it('find should be able to query by location via near with minDistance set',
+      () => new Promise((resolve, reject) => {
+        const coords = {lat: 30.274085, lng: 120.15507000000002};
+        geoDb.autoupdate(function(err) {
+          Promise.all([
+            new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (createLocationPost(true))((err) => err ? rej(err) : res())),
+          ]).then(() => (function(err) {
+            if (err) return reject(err);
             PostWithLocation.find(
               {
                 where: {
@@ -2796,26 +2924,52 @@ describe('mongodb connector', function() {
                 },
               },
               function(err, results) {
-                if (err) return done(err);
-                results.length.should.be.equal(1);
+                if (err) return reject(err);
+                assert.strictEqual(results.length, 1);
                 let dist = 0;
                 results.forEach(function(result) {
                   const currentDist = testUtils.getDistanceBetweenPoints(
                     coords,
                     result.location,
                   );
-                  currentDist.should.be.aboveOrEqual(dist);
+                  assert.ok(currentDist >= dist);
                   dist = currentDist;
                 });
-                done();
+                resolve();
               },
             );
-          },
-        );
-      });
-    });
+          })(null), (err) => (function(err) {
+            if (err) return reject(err);
+            PostWithLocation.find(
+              {
+                where: {
+                  location: {
+                    near: new GeoPoint(coords),
+                    minDistance: 17000,
+                    unit: 'meters',
+                  },
+                },
+              },
+              function(err, results) {
+                if (err) return reject(err);
+                assert.strictEqual(results.length, 1);
+                let dist = 0;
+                results.forEach(function(result) {
+                  const currentDist = testUtils.getDistanceBetweenPoints(
+                    coords,
+                    result.location,
+                  );
+                  assert.ok(currentDist >= dist);
+                  dist = currentDist;
+                });
+                resolve();
+              },
+            );
+          })(err));
+        });
+      }));
 
-    it('find should be able to set unit when query location via near', function(done) {
+    it('find should be able to set unit when query location via near', () => new Promise((resolve, reject) => {
       const coords = {lat: 30.274085, lng: 120.15507000000002};
 
       geoDb.autoupdate(function(err) {
@@ -2837,14 +2991,14 @@ describe('mongodb connector', function() {
                 },
               },
               function(err, results) {
-                if (err) return done(err);
-                results.length.should.be.equal(numOfResult);
+                if (err) return reject(err);
+                assert.strictEqual(results.length, numOfResult);
                 results.forEach(function(result) {
                   const currentDist = testUtils.getDistanceBetweenPoints(
                     coords,
                     result.location,
                   );
-                  currentDist.should.be.belowOrEqual(distanceInMeter / 1000);
+                  assert.ok(currentDist <= distanceInMeter / 1000);
                 });
                 callback();
               },
@@ -2852,37 +3006,31 @@ describe('mongodb connector', function() {
           };
         };
 
-        async.parallel(
-          [
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(false),
-            createLocationPost(true),
-          ],
-          function(err) {
-            if (err) return done(err);
-            async.parallel(
-              [
-                queryLocation(10000, undefined, 10000, 3),
-                queryLocation(10, 'miles', 16000, 3),
-                queryLocation(10, 'kilometers', 10000, 3),
-                queryLocation(20000, 'feet', 6096, 3),
-                queryLocation(10000, 'radians', 10000, 3),
-                queryLocation(10000, 'degrees', 10000, 3),
-              ],
-              done,
-            );
-          },
+        Promise.all([
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(false))((err) => err ? rej(err) : res())),
+          new Promise((res, rej) => (createLocationPost(true))((err) => err ? rej(err) : res())),
+        ]).then(
+          () => Promise.all([
+            new Promise((res, rej) => (queryLocation(10000, undefined, 10000, 3))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (queryLocation(10, 'miles', 16000, 3))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (queryLocation(10, 'kilometers', 10000, 3))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (queryLocation(20000, 'feet', 6096, 3))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (queryLocation(10000, 'radians', 10000, 3))((err) => err ? rej(err) : res())),
+            new Promise((res, rej) => (queryLocation(10000, 'degrees', 10000, 3))((err) => err ? rej(err) : res())),
+          ]).then(() => resolve(), reject),
+          reject,
         );
       });
-    });
+    }));
 
-    afterEach(function(done) {
-      PostWithLocation.destroyAll(done);
-    });
+    afterEach(() => new Promise((resolve, reject) => {
+      PostWithLocation.destroyAll((err) => err ? reject(err) : resolve());
+    }));
   });
 
-  it('find should order by id if the order is not set for the query filter', function(done) {
+  it('find should order by id if the order is not set for the query filter', () => new Promise((resolve, reject) => {
     PostWithStringId.create({id: '2', title: 'c', content: 'CCC'}, function(
       err,
       post,
@@ -2892,108 +3040,108 @@ describe('mongodb connector', function() {
         post,
       ) {
         PostWithStringId.find(function(err, posts) {
-          should.not.exist(err);
-          posts.length.should.be.equal(2);
-          posts[0].id.should.be.equal('1');
+          assert.ok(err == null);
+          assert.strictEqual(posts.length, 2);
+          assert.strictEqual(posts[0].id, '1');
 
           PostWithStringId.find({limit: 1, offset: 0}, function(err, posts) {
-            should.not.exist(err);
-            posts.length.should.be.equal(1);
-            posts[0].id.should.be.equal('1');
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 1);
+            assert.strictEqual(posts[0].id, '1');
 
             PostWithStringId.find({limit: 1, offset: 1}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.be.equal(1);
-              posts[0].id.should.be.equal('2');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].id, '2');
+              resolve();
             });
           });
         });
       });
     });
-  });
+  }));
 
   it('find should not order by id if the order is not set for the query filter and settings.disableDefaultSort is true',
-    function(done) {
+    () => new Promise((resolve, reject) => {
       PostWithDisableDefaultSort.create({id: '2', title: 'c', content: 'CCC'}, function(err, post) {
         PostWithDisableDefaultSort.create({id: '1', title: 'd', content: 'DDD'}, function(err, post) {
           PostWithDisableDefaultSort.find({}, function(err, posts) {
-            should.not.exist(err);
-            posts.length.should.be.equal(2);
-            posts[0].id.should.be.equal('2');
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 2);
+            assert.strictEqual(posts[0].id, '2');
 
             PostWithDisableDefaultSort.find({limit: 1, offset: 0}, function(err, posts) {
-              should.not.exist(err);
-              posts.length.should.be.equal(1);
-              posts[0].id.should.be.equal('2');
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].id, '2');
 
               PostWithDisableDefaultSort.find({limit: 1, offset: 1}, function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.be.equal(1);
-                posts[0].id.should.be.equal('1');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].id, '1');
+                resolve();
               });
             });
           });
         });
       });
-    });
+    }));
 
-  it('should report error on duplicate keys', function(done) {
+  it('should report error on duplicate keys', () => new Promise((resolve, reject) => {
     Post.create({title: 'd', content: 'DDD'}, function(err, post) {
       Post.create({id: post.id, title: 'd', content: 'DDD'}, function(
         err,
         post,
       ) {
-        should.exist(err);
-        done();
+        assert.ok(err != null);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find using case insensitive index', function(done) {
+  it('should allow to find using case insensitive index', () => new Promise((resolve, reject) => {
     Category.create({title: 'My Category'}, function(err, category1) {
-      if (err) return done(err);
+      if (err) return reject(err);
       Category.create({title: 'MY CATEGORY'}, function(err, category2) {
-        if (err) return done(err);
+        if (err) return reject(err);
 
         Category.find({where: {title: 'my cATEGory'}}, {collation: {locale: 'en', strength: 1}},
           function(err, categories) {
-            if (err) return done(err);
-            categories.should.have.length(2);
-            done();
+            if (err) return reject(err);
+            assert.strictEqual(categories.length, 2);
+            resolve();
           });
       });
     });
-  });
+  }));
 
-  it('should allow to find using like', function(done) {
+  it('should allow to find using like', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {like: 'M.+st'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 1);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 1);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find using case insensitive like', function(done) {
+  it('should allow to find using case insensitive like', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {like: 'm.+st', options: 'i'}}}, function(
         err,
         posts,
       ) {
-        should.not.exist(err);
-        posts.should.have.property('length', 1);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 1);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find using like with renamed columns', function(done) {
+  it('should allow to find using like with renamed columns', () => new Promise((resolve, reject) => {
     PostWithStringId.create({title: 'My Post', content: 'Hello'}, function(
       err,
       post,
@@ -3001,185 +3149,186 @@ describe('mongodb connector', function() {
       PostWithStringIdAndRenamedColumns.find(
         {where: {renamedTitle: {like: 'M.+st'}}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 1);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should allow to find using like with renamed columns (inverse create order)', function(done) {
-    PostWithStringIdAndRenamedColumns.create(
-      {renamedTitle: 'My Post', renamedContent: 'Hello'},
-      function(err, post) {
-        PostWithStringId.find({where: {title: {like: 'M.+st'}}}, function(
-          err,
-          posts,
-        ) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
-        });
-      },
-    );
-  });
+  it('should allow to find using like with renamed columns (inverse create order)',
+    () => new Promise((resolve, reject) => {
+      PostWithStringIdAndRenamedColumns.create(
+        {renamedTitle: 'My Post', renamedContent: 'Hello'},
+        function(err, post) {
+          PostWithStringId.find({where: {title: {like: 'M.+st'}}}, function(
+            err,
+            posts,
+          ) {
+            assert.ok(err == null);
+            assert.strictEqual(posts['length'], 1);
+            resolve();
+          });
+        },
+      );
+    }));
 
-  it('should allow to find using case insensitive like - test 2', function(done) {
+  it('should allow to find using case insensitive like - test 2', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {content: {like: 'HELLO', options: 'i'}}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 1);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support like for no match', function(done) {
+  it('should support like for no match', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {like: 'M.+XY'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 0);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 0);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find using nlike', function(done) {
+  it('should allow to find using nlike', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {nlike: 'M.+st'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 0);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 0);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should allow to find using case insensitive nlike', function(done) {
+  it('should allow to find using case insensitive nlike', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {title: {nlike: 'm.+st', options: 'i'}}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 0);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 0);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support nlike for no match', function(done) {
+  it('should support nlike for no match', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {nlike: 'M.+XY'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 1);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 1);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should support "and" operator that is satisfied', function(done) {
+  it('should support "and" operator that is satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {and: [{title: 'My Post'}, {content: 'Hello'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 1);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support "and" operator that is not satisfied', function(done) {
+  it('should support "and" operator that is not satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {and: [{title: 'My Post'}, {content: 'Hello1'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 0);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 0);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support "or" that is satisfied', function(done) {
+  it('should support "or" that is satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {or: [{title: 'My Post'}, {content: 'Hello1'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 1);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support "or" operator that is not satisfied', function(done) {
+  it('should support "or" operator that is not satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {or: [{title: 'My Post1'}, {content: 'Hello1'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 0);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 0);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support "nor" operator that is satisfied', function(done) {
+  it('should support "nor" operator that is satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {nor: [{title: 'My Post1'}, {content: 'Hello1'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 1);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 1);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support "nor" operator that is not satisfied', function(done) {
+  it('should support "nor" operator that is not satisfied', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find(
         {where: {nor: [{title: 'My Post'}, {content: 'Hello1'}]}},
         function(err, posts) {
-          should.not.exist(err);
-          posts.should.have.property('length', 0);
-          done();
+          assert.ok(err == null);
+          assert.strictEqual(posts['length'], 0);
+          resolve();
         },
       );
     });
-  });
+  }));
 
-  it('should support neq for match', function(done) {
+  it('should support neq for match', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {neq: 'XY'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 1);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 1);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should support neq for no match', function(done) {
+  it('should support neq for no match', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.find({where: {title: {neq: 'My Post'}}}, function(err, posts) {
-        should.not.exist(err);
-        posts.should.have.property('length', 0);
-        done();
+        assert.ok(err == null);
+        assert.strictEqual(posts['length'], 0);
+        resolve();
       });
     });
-  });
+  }));
 
-  it('should support count without where', function(done) {
+  it('should support count without where', () => new Promise((resolve, reject) => {
     const POST_NUMBER = 35;
     const posts = [];
     for (let i = 0; i < POST_NUMBER; i++) {
@@ -3188,36 +3337,36 @@ describe('mongodb connector', function() {
 
     Post.create(posts, function() {
       Post.count(function(err, count) {
-        if (err) return done(err);
-        count.should.be.equal(POST_NUMBER);
-        done();
+        if (err) return reject(err);
+        assert.strictEqual(count, POST_NUMBER);
+        resolve();
       });
     });
-  });
+  }));
 
   // The where object should be parsed by the connector
-  it('should support where for count', function(done) {
+  it('should support where for count', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       Post.count(
         {and: [{title: 'My Post'}, {content: 'Hello'}]},
         function(err, count) {
-          should.not.exist(err);
-          count.should.be.equal(1);
+          assert.ok(err == null);
+          assert.strictEqual(count, 1);
           Post.count(
             {and: [{title: 'My Post1'}, {content: 'Hello'}]},
             function(err, count) {
-              should.not.exist(err);
-              count.should.be.equal(0);
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(count, 0);
+              resolve();
             },
           );
         },
       );
     });
-  });
+  }));
 
   // The where object should be parsed by the connector
-  it('should support where for destroyAll', function(done) {
+  it('should support where for destroyAll', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post1', content: 'Hello'}, function(err, post) {
       Post.create({title: 'My Post2', content: 'Hello'}, function(err, post) {
         Post.destroyAll(
@@ -3225,22 +3374,22 @@ describe('mongodb connector', function() {
             and: [{title: 'My Post1'}, {content: 'Hello'}],
           },
           function(err) {
-            should.not.exist(err);
+            assert.ok(err == null);
             Post.count(function(err, count) {
-              should.not.exist(err);
-              count.should.be.equal(1);
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(count, 1);
+              resolve();
             });
           },
         );
       });
     });
-  });
+  }));
 
   it(
     'should support where for count (using renamed columns in deep filter ' +
     'criteria)',
-    function(done) {
+    () => new Promise((resolve, reject) => {
       PostWithStringId.create({title: 'My Post', content: 'Hello'}, function(
         err,
         post,
@@ -3255,8 +3404,8 @@ describe('mongodb connector', function() {
             ],
           },
           function(err, count) {
-            should.not.exist(err);
-            count.should.be.equal(1);
+            assert.ok(err == null);
+            assert.strictEqual(count, 1);
             PostWithStringIdAndRenamedColumns.count(
               {
                 and: [
@@ -3267,50 +3416,50 @@ describe('mongodb connector', function() {
                 ],
               },
               function(err, count) {
-                should.not.exist(err);
-                count.should.be.equal(0);
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(count, 0);
+                resolve();
               },
             );
           },
         );
       });
-    },
+    }),
   );
 
-  it('should return info for destroy', function(done) {
+  it('should return info for destroy', () => new Promise((resolve, reject) => {
     Post.create({title: 'My Post', content: 'Hello'}, function(err, post) {
       post.destroy(function(err, info) {
-        should.not.exist(err);
-        info.should.be.eql({count: 1});
-        done();
+        assert.ok(err == null);
+        assert.deepStrictEqual(info, {count: 1});
+        resolve();
       });
     });
-  });
+  }));
 
   it('should export the MongoDB function', function() {
     const module = require('../');
-    module.MongoDB.should.be.an.instanceOf(Function);
+    assert.ok(module.MongoDB instanceof Function);
   });
 
   it('should export the ObjectID function', function() {
     const module = require('../');
-    module.ObjectID.should.be.an.instanceOf(Function);
+    assert.ok(module.ObjectID instanceof Function);
   });
 
   it('should export the generateMongoDBURL function', function() {
     const module = require('../');
-    module.generateMongoDBURL.should.be.an.instanceOf(Function);
+    assert.ok(module.generateMongoDBURL instanceof Function);
   });
 
   describe('Test generateMongoDBURL function', function() {
     const module = require('../');
-    context('should return correct mongodb url ', function() {
+    describe('should return correct mongodb url ', function() {
       it('when only passing in database', function() {
         const options = {
           database: 'fakeDatabase',
         };
-        module.generateMongoDBURL(options).should.be.eql('mongodb://127.0.0.1:27017/fakeDatabase');
+        assert.deepStrictEqual(module.generateMongoDBURL(options), 'mongodb://127.0.0.1:27017/fakeDatabase');
       });
       it('when protocol is mongodb and no username/password', function() {
         const options = {
@@ -3319,7 +3468,7 @@ describe('mongodb connector', function() {
           port: 9999,
           database: 'fakeDatabase',
         };
-        module.generateMongoDBURL(options).should.be.eql('mongodb://fakeHostname:9999/fakeDatabase');
+        assert.deepStrictEqual(module.generateMongoDBURL(options), 'mongodb://fakeHostname:9999/fakeDatabase');
       });
       it('when protocol is mongodb and has username/password', function() {
         const options = {
@@ -3330,7 +3479,10 @@ describe('mongodb connector', function() {
           username: 'fakeUsername',
           password: 'fakePassword',
         };
-        module.generateMongoDBURL(options).should.be.eql('mongodb://fakeUsername:fakePassword@fakeHostname:9999/fakeDatabase');
+        assert.deepStrictEqual(
+          module.generateMongoDBURL(options),
+          'mongodb://fakeUsername:fakePassword@fakeHostname:9999/fakeDatabase',
+        );
       });
       it('when protocol is mongodb+srv and no username/password', function() {
         const options = {
@@ -3340,7 +3492,7 @@ describe('mongodb connector', function() {
           database: 'fakeDatabase',
         };
         // mongodb+srv url should not have the port in it
-        module.generateMongoDBURL(options).should.be.eql('mongodb+srv://fakeHostname/fakeDatabase');
+        assert.deepStrictEqual(module.generateMongoDBURL(options), 'mongodb+srv://fakeHostname/fakeDatabase');
       });
       it('when protocol is mongodb+srv and has username/password', function() {
         const options = {
@@ -3352,452 +3504,452 @@ describe('mongodb connector', function() {
           password: 'fakePassword',
         };
         // mongodb+srv url should not have the port in it
-        module.generateMongoDBURL(options).should.be.eql('mongodb+srv://fakeUsername:fakePassword@fakeHostname/fakeDatabase');
+        assert.deepStrictEqual(
+          module.generateMongoDBURL(options),
+          'mongodb+srv://fakeUsername:fakePassword@fakeHostname/fakeDatabase',
+        );
       });
     });
   });
 
-  context('fieldsArrayToObj', function() {
+  describe('fieldsArrayToObj', function() {
     const fieldsArrayToObj = require('../').fieldsArrayToObj;
     it('should export the fieldsArrayToObj function', function() {
-      fieldsArrayToObj.should.be.an.instanceOf(Function);
+      assert.ok(fieldsArrayToObj instanceof Function);
     });
 
     it('should return actual object if provided input is not an array', function() {
-      fieldsArrayToObj({someField: 1}).should.be.eql({someField: 1});
+      assert.deepStrictEqual(fieldsArrayToObj({someField: 1}), {someField: 1});
     });
 
     it('should provide the single _id element when input array empty', function() {
-      fieldsArrayToObj([]).should.be.eql({_id: 1});
+      assert.deepStrictEqual(fieldsArrayToObj([]), {_id: 1});
     });
 
     it('should properly convert the provided array to object', function() {
-      fieldsArrayToObj(['prop1', 'prop2']).should.be.eql({prop1: 1, prop2: 1});
+      assert.deepStrictEqual(fieldsArrayToObj(['prop1', 'prop2']), {prop1: 1, prop2: 1});
     });
   });
 
-  context('regexp operator', function() {
-    before(function deleteExistingTestFixtures(done) {
-      Post.destroyAll(done);
-    });
-    beforeEach(function createTestFixtures(done) {
+  describe('regexp operator', function() {
+    before(() => new Promise((resolve, reject) => {
+      Post.destroyAll((err) => err ? reject(err) : resolve());
+    }));
+    beforeEach(() => new Promise((resolve, reject) => {
       Post.create(
         [{title: 'a', content: 'AAA'}, {title: 'b', content: 'BBB'}],
-        done,
+        (err) => err ? reject(err) : resolve(),
       );
-    });
-    after(function deleteTestFixtures(done) {
-      Post.destroyAll(done);
-    });
+    }));
+    after(() => new Promise((resolve, reject) => {
+      Post.destroyAll((err) => err ? reject(err) : resolve());
+    }));
 
-    context('with regex strings', function() {
-      context('using no flags', function() {
-        it('should work', function(done) {
+    describe('with regex strings', function() {
+      describe('using no flags', function() {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: '^A'}}}, function(
             err,
             posts,
           ) {
-            should.not.exist(err);
-            posts.length.should.equal(1);
-            posts[0].content.should.equal('AAA');
-            done();
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 1);
+            assert.strictEqual(posts[0].content, 'AAA');
+            resolve();
           });
-        });
+        }));
       });
 
-      context('using flags', function() {
+      describe('using flags', function() {
         beforeEach(function addSpy() {
-          sinon.stub(console, 'warn');
+          sinon.stub(console, 'error');
         });
         afterEach(function removeSpy() {
-          console.warn.restore();
+          console.error.restore();
         });
 
-        it('should work', function(done) {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: '^a/i'}}}, function(
             err,
             posts,
           ) {
-            should.not.exist(err);
-            posts.length.should.equal(1);
-            posts[0].content.should.equal('AAA');
-            done();
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 1);
+            assert.strictEqual(posts[0].content, 'AAA');
+            resolve();
           });
-        });
+        }));
 
-        it('should print a warning when the global flag is set', function(done) {
+        it('should print a warning when the global flag is set', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: '^a/g'}}}, function(
             err,
             posts,
           ) {
-            // eslint-disable-next-line
-            console.warn.calledOnce.should.be.ok;
-            done();
+            assert.ok(console.error.calledOnce);
+            resolve();
           });
-        });
+        }));
       });
     });
 
-    context('with regex literals', function() {
-      context('using no flags', function() {
-        it('should work', function(done) {
+    describe('with regex literals', function() {
+      describe('using no flags', function() {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: /^A/}}}, function(
             err,
             posts,
           ) {
-            should.not.exist(err);
-            posts.length.should.equal(1);
-            posts[0].content.should.equal('AAA');
-            done();
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 1);
+            assert.strictEqual(posts[0].content, 'AAA');
+            resolve();
           });
-        });
+        }));
       });
 
-      context('using flags', function() {
+      describe('using flags', function() {
         beforeEach(function addSpy() {
-          sinon.stub(console, 'warn');
+          sinon.stub(console, 'error');
         });
         afterEach(function removeSpy() {
-          console.warn.restore();
+          console.error.restore();
         });
 
-        it('should work', function(done) {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: /^a/i}}}, function(
             err,
             posts,
           ) {
-            should.not.exist(err);
-            posts.length.should.equal(1);
-            posts[0].content.should.equal('AAA');
-            done();
+            assert.ok(err == null);
+            assert.strictEqual(posts.length, 1);
+            assert.strictEqual(posts[0].content, 'AAA');
+            resolve();
           });
-        });
+        }));
 
-        it('should print a warning when the global flag is set', function(done) {
+        it('should print a warning when the global flag is set', () => new Promise((resolve, reject) => {
           Post.find({where: {content: {regexp: /^a/g}}}, function(
             err,
             posts,
           ) {
-            // eslint-disable-next-line
-            console.warn.calledOnce.should.be.ok;
-            done();
+            assert.ok(console.error.calledOnce);
+            resolve();
           });
-        });
+        }));
       });
     });
 
-    context('with regex object', function() {
-      context('using no flags', function() {
-        it('should work', function(done) {
+    describe('with regex object', function() {
+      describe('using no flags', function() {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find(
             {where: {content: {regexp: new RegExp(/^A/)}}},
             function(err, posts) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('AAA');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'AAA');
+              resolve();
             },
           );
-        });
+        }));
       });
 
-      context('using flags', function() {
+      describe('using flags', function() {
         beforeEach(function addSpy() {
-          sinon.stub(console, 'warn');
+          sinon.stub(console, 'error');
         });
         afterEach(function removeSpy() {
-          console.warn.restore();
+          console.error.restore();
         });
 
-        it('should work', function(done) {
+        it('should work', () => new Promise((resolve, reject) => {
           Post.find(
             {where: {content: {regexp: new RegExp(/^a/i)}}},
             function(err, posts) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('AAA');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'AAA');
+              resolve();
             },
           );
-        });
+        }));
 
-        it('should print a warning when the global flag is set', function(done) {
+        it('should print a warning when the global flag is set', () => new Promise((resolve, reject) => {
           Post.find(
             {where: {content: {regexp: new RegExp(/^a/g)}}},
             function(err, posts) {
-              // eslint-disable-next-line
-              console.warn.calledOnce.should.be.ok;
-              done();
+              assert.ok(console.error.calledOnce);
+              resolve();
             },
           );
-        });
+        }));
       });
     });
   });
 
-  context('like and nlike operator', function() {
-    before(function deleteExistingTestFixtures(done) {
-      Post.destroyAll(done);
-    });
-    beforeEach(function createTestFixtures(done) {
+  describe('like and nlike operator', function() {
+    before(() => new Promise((resolve, reject) => {
+      Post.destroyAll((err) => err ? reject(err) : resolve());
+    }));
+    beforeEach(() => new Promise((resolve, reject) => {
       Post.create(
         [{title: 'a', content: 'AAA'}, {title: 'b', content: 'BBB'}],
-        done,
+        (err) => err ? reject(err) : resolve(),
       );
-    });
-    after(function deleteTestFixtures(done) {
-      Post.destroyAll(done);
-    });
+    }));
+    after(() => new Promise((resolve, reject) => {
+      Post.destroyAll((err) => err ? reject(err) : resolve());
+    }));
 
-    context('like operator', function() {
-      context('with regex strings', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+    describe('like operator', function() {
+      describe('with regex strings', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {like: '^A'}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('AAA');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'AAA');
+              resolve();
             });
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {like: '^a', options: 'i'}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('AAA');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'AAA');
+                resolve();
               },
             );
-          });
+          }));
         });
       });
 
-      context('with regex literals', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+      describe('with regex literals', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {like: /^A/}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('AAA');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'AAA');
+              resolve();
             });
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {like: /^a/i}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('AAA');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'AAA');
+              resolve();
             });
-          });
+          }));
         });
       });
 
-      context('with regex object', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+      describe('with regex object', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {like: new RegExp(/^A/)}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('AAA');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'AAA');
+                resolve();
               },
             );
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {like: new RegExp(/^a/i)}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('AAA');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'AAA');
+                resolve();
               },
             );
-          });
+          }));
         });
       });
     });
 
-    context('nlike operator', function() {
-      context('with regex strings', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+    describe('nlike operator', function() {
+      describe('with regex strings', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {nlike: '^A'}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('BBB');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'BBB');
+              resolve();
             });
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {nlike: '^a', options: 'i'}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('BBB');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'BBB');
+                resolve();
               },
             );
-          });
+          }));
         });
       });
 
-      context('with regex literals', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+      describe('with regex literals', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {nlike: /^A/}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('BBB');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'BBB');
+              resolve();
             });
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find({where: {content: {nlike: /^a/i}}}, function(
               err,
               posts,
             ) {
-              should.not.exist(err);
-              posts.length.should.equal(1);
-              posts[0].content.should.equal('BBB');
-              done();
+              assert.ok(err == null);
+              assert.strictEqual(posts.length, 1);
+              assert.strictEqual(posts[0].content, 'BBB');
+              resolve();
             });
-          });
+          }));
         });
       });
 
-      context('with regex object', function() {
-        context('using no flags', function() {
-          it('should work', function(done) {
+      describe('with regex object', function() {
+        describe('using no flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {nlike: new RegExp(/^A/)}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('BBB');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'BBB');
+                resolve();
               },
             );
-          });
+          }));
         });
 
-        context('using flags', function() {
-          it('should work', function(done) {
+        describe('using flags', function() {
+          it('should work', () => new Promise((resolve, reject) => {
             Post.find(
               {where: {content: {nlike: new RegExp(/^a/i)}}},
               function(err, posts) {
-                should.not.exist(err);
-                posts.length.should.equal(1);
-                posts[0].content.should.equal('BBB');
-                done();
+                assert.ok(err == null);
+                assert.strictEqual(posts.length, 1);
+                assert.strictEqual(posts[0].content, 'BBB');
+                resolve();
               },
             );
-          });
+          }));
         });
       });
     });
   });
 
-  context('trimLeadingDollarSigns', () =>{
+  describe('trimLeadingDollarSigns', () =>{
     it('removes an extra leading dollar sign in ths operators', () => {
       const spec = '$eq';
       const updatedSpec = trimLeadingDollarSigns(spec);
-      updatedSpec.should.equal('eq');
+      assert.strictEqual(updatedSpec, 'eq');
     });
     it('removes extra leading dollar signs in ths operators', () => {
       const spec = '$$eq';
       const updatedSpec = trimLeadingDollarSigns(spec);
-      updatedSpec.should.equal('eq');
+      assert.strictEqual(updatedSpec, 'eq');
     });
 
     it('remains the same if the input does not contain any dollar signs', () => {
       const spec = 'eq';
       const updatedSpec = trimLeadingDollarSigns(spec);
-      updatedSpec.should.equal(spec);
+      assert.strictEqual(updatedSpec, spec);
     });
     it('remains the same if the input does not start with dollar signs', () => {
       const spec = 'eq$';
       const updatedSpec = trimLeadingDollarSigns(spec);
-      updatedSpec.should.equal(spec);
+      assert.strictEqual(updatedSpec, spec);
     });
   });
-  context('sanitizeFilter()', () => {
+  describe('sanitizeFilter()', () => {
     it('returns filter if not an object', () => {
       const input = false;
       const out = sanitizeFilter(input);
-      out.should.equal(input);
+      assert.strictEqual(out, input);
     });
 
     it('returns the filter if options.disableSanitization is true', () => {
       const input = {key: 'value', $where: 'a value'};
       const out = sanitizeFilter(input, {disableSanitization: true});
-      out.should.deepEqual(input);
+      assert.deepStrictEqual(out, input);
     });
 
     it('removes `$where` property', () => {
       const input = {key: 'value', $where: 'a value'};
       const out = sanitizeFilter(input);
-      out.should.deepEqual({key: 'value'});
+      assert.deepStrictEqual(out, {key: 'value'});
     });
 
     it('does not remove properties with `$` in it', () => {
       const input = {key: 'value', $where: 'a value', random$key: 'random'};
       const out = sanitizeFilter(input);
-      out.should.deepEqual({key: 'value', random$key: 'random'});
+      assert.deepStrictEqual(out, {key: 'value', random$key: 'random'});
     });
 
     it('removes `mapReduce` property in the object', () => {
       const input = {key: 'value', random$key: 'a value', mapReduce: 'map'};
       const out = sanitizeFilter(input);
-      out.should.deepEqual({key: 'value', random$key: 'a value'});
+      assert.deepStrictEqual(out, {key: 'value', random$key: 'a value'});
     });
   });
 
-  after(function(done) {
+  after(() => new Promise((resolve, reject) => {
     User.destroyAll(function() {
       Post.destroyAll(function() {
         PostWithObjectId.destroyAll(function() {
           PostWithNumberId.destroyAll(function() {
-            PostWithNumberUnderscoreId.destroyAll(done);
+            PostWithNumberUnderscoreId.destroyAll(() => resolve());
           });
         });
       });
     });
-  });
+  }));
 });
