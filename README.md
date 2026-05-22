@@ -20,11 +20,15 @@ If you create a MongoDB data source using the data source generator as described
 
 This module adopts the [Module Long Term Support (LTS)](http://github.com/CloudNativeJS/ModuleLTS) policy, with the following End Of Life (EOL) dates:
 
-| Version    | Status               | Published | EOL                  | LoopBack | Juggler      |
-| ---------- | -------------------- | --------- | -------------------- | ---------|--------------|
-| 6.x        | Current              | Mar 2021  | TBD                  | 4        | 4.x, 5.x     |
-| 5.x        | End of Life          | Jun 2019  | Apr 2023             | 3, 4     | 3.x, 4.x     |
-| 4.x        | End of Life          | Nov 2018  | Apr 2021             | 3, 4     | 3.x, 4.x     |
+| Version    | Status               | Published | EOL                  | LoopBack | Juggler      | MongoDB driver |
+| ---------- | -------------------- | --------- | -------------------- | ---------|--------------| -------------- |
+| 7.x        | Current              | May 2026  | TBD                  | 4        | 4.x, 5.x     | ^7.2.0         |
+| 6.x        | End of Life          | Mar 2021  | May 2026             | 4        | 4.x, 5.x     | ^4.6.0         |
+| 5.x        | End of Life          | Jun 2019  | Apr 2023             | 3, 4     | 3.x, 4.x     | ^3.x           |
+| 4.x        | End of Life          | Nov 2018  | Apr 2021             | 3, 4     | 3.x, 4.x     | ^3.x           |
+
+**Node.js requirement**: ≥ 22 (enforced in `package.json` `engines` field).
+**MongoDB Server requirement**: ≥ 4.0 (required by the `mongodb ^7.x` driver).
 
 ## Creating a MongoDB data source
 
@@ -311,54 +315,68 @@ export class User extends Entity {
 
 ## Running tests
 
-### Own instance
-
-If you have a local or remote MongoDB instance and would like to use that to run the test suite, use the following command:
-
-- Linux
+The project uses Yarn 4 and requires Node.js ≥ 22 and a running MongoDB instance
+(default: `localhost:27017`).
 
 ```bash
-MONGODB_HOST=<HOST> MONGODB_PORT=<PORT> MONGODB_DATABASE=<DATABASE> CI=true npm test
+yarn install
+yarn test          # unit + juggler-v4 + juggler-v5 suites + lint
 ```
 
-- Windows
+### Test suites
+
+| Script | What it runs |
+|---|---|
+| `yarn test:unit` | Own test suite under `node --test` + `c8` coverage |
+| `yarn test:juggler` | Upstream juggler-v4 suite under mocha |
+| `yarn test:juggler:v5` | Upstream juggler-v5 (perkd fork) suite under mocha |
+| `yarn test:transactions` | Transaction suite — requires a local MongoDB replica set (see below) |
+| `make leak-detection` | Heap-growth leak detection suite |
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `MONGODB_HOST` | `localhost` | MongoDB host |
+| `MONGODB_PORT` | `27017` | MongoDB port |
+| `MONGODB_DATABASE` | `lb-ds-mongodb-test-1` | Base database name (a per-file suffix is appended) |
+| `TEST_TRANSACTIONS` | unset | Set to `1` to enable the transaction test suite |
+
+### Transaction tests
+
+Transactions require a MongoDB replica set. Start a local one with:
 
 ```bash
-SET MONGODB_HOST=<HOST> SET MONGODB_PORT=<PORT> SET MONGODB_DATABASE=<DATABASE> SET CI=true npm test
+run-rs -v 4.2.0 --host localhost --portStart 27000
+```
+
+Then run:
+
+```bash
+yarn test:transactions
 ```
 
 ### Docker
 
-If you do not have a local MongoDB instance, you can also run the test suite with very minimal requirements.
-
-- Assuming you have [Docker](https://docs.docker.com/engine/installation/) installed, run the following script which would spawn a MongoDB instance on your local:
+If you do not have a local MongoDB instance, spawn one with Docker:
 
 ```bash
 source setup.sh <HOST> <PORT> <DATABASE>
+yarn test
 ```
 
-where `<HOST>`, `<PORT>` and `<DATABASE>` are optional parameters. The default values are `localhost`, `27017` and `testdb` respectively.
-
-- Run the test:
-
-```bash
-npm test
-```
+`<HOST>`, `<PORT>`, and `<DATABASE>` default to `localhost`, `27017`, and `testdb`.
 
 ### Leak detection
 
-Uses a built-in heap-growth detector (`leak-detection/heap-leak.js`) — no
-native modules to install. Requires MongoDB running on `localhost:27017`.
-
-Tests run for 100 iterations by default. Increase via `ITERATIONS` for
-higher confidence (recommended ≥500 before a driver upgrade).
+Uses a zero-dependency heap-growth detector (`leak-detection/heap-leak.js`) built on
+`v8.getHeapStatistics()` — no native modules to install. Requires MongoDB on
+`localhost:27017`. The `--expose-gc` flag is passed automatically by the Makefile.
 
 ```bash
-make leak-detection          # 100 iterations (default)
-ITERATIONS=500 make leak-detection  # higher confidence run
+make leak-detection             # 100 iterations (default)
+ITERATIONS=500 make leak-detection   # higher confidence
 ```
-
-The `--expose-gc` flag is passed automatically by the Makefile.
 
 ## Running benchmarks
 

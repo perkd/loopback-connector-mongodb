@@ -23,7 +23,7 @@ that pattern.
 
 The connector itself has no notion of "tenant". A `grep -rni tenant lib/` returns zero
 hits, and the codebase has exactly one `client.db(...)` call site at
-[lib/mongodb.js:388](lib/mongodb.js#L388), which selects a database **once** at
+[lib/mongodb.js:327](lib/mongodb.js#L327), which selects a database **once** at
 connect time and binds it to the connector instance for its full lifetime.
 
 ## What this connector does NOT do
@@ -34,10 +34,10 @@ provide them:
 - **No tenant abstraction.** No `tenant`, `multitenant`, `useDb`, or `selectDb` APIs
   anywhere in `lib/`.
 - **No per-call database switching.** The `Db` handle is acquired once at
-  [lib/mongodb.js:388](lib/mongodb.js#L388) and reused for every operation on that
+  [lib/mongodb.js:327](lib/mongodb.js#L327) and reused for every operation on that
   `DataSource`. The connector never calls `client.db(otherName)` mid-lifetime.
 - **No tenant-keyed connection cache.** Each `DataSource` owns exactly one
-  `MongoClient` ([lib/mongodb.js:355](lib/mongodb.js#L355)) and one `Db`. There is
+  `MongoClient` ([lib/mongodb.js:317](lib/mongodb.js#L317)) and one `Db`. There is
   no `Map<tenantCode, MongoClient>` and no shared client across DataSources.
 - **No tenant context awareness.** The connector does not read
   `@perkd/multitenant-context`, `Context.tenant`, or `global.loopbackContext`. Tenant
@@ -77,7 +77,7 @@ coverage map* below.
    server are fully isolated: writes via DataSource A never appear in DataSource B's
    `Db`, even when both target the same cluster.
 2. **Independent lifecycle.** Calling `disconnect()`
-   ([lib/mongodb.js:2033-2055](lib/mongodb.js#L2033-L2055)) on one `DataSource` has
+   ([lib/mongodb.js:1915](lib/mongodb.js#L1915)) on one `DataSource` has
    no observable effect on any other `DataSource`, even when they share an
    underlying MongoDB server.
 3. **Concurrent lazy connect.** With `lazyConnect: true`, N concurrent first-use
@@ -85,33 +85,27 @@ coverage map* below.
    No `DataSource` connects twice; no query is dropped.
 4. **Session scoping.** Transactions and sessions are scoped to the `MongoClient`
    that opened them. Session merging in `buildOptions()`
-   ([lib/mongodb.js:2510](lib/mongodb.js#L2510)) never leaks a session from
+   ([lib/mongodb.js:2389](lib/mongodb.js#L2389)) never leaks a session from
    DataSource A into an operation on DataSource B.
 5. **Pool sizing via `maxPoolSize` works end-to-end.** Consumers can set
    `maxPoolSize` / `minPoolSize` and have them honored by the underlying driver.
-   Note: the connector's option allow-list at
-   [lib/mongodb.js:238](lib/mongodb.js#L238) still names the legacy `poolSize`,
-   but the `mongodb` 4.6.x driver itself rejects it
-   (`MongoParseError: option poolsize is not supported`); only `maxPoolSize`
-   actually flows through. This stale allow-list entry should be removed as part
-   of the 7.x upgrade.
+   The stale `poolSize` entry has been removed from the connector's option
+   allow-list ([lib/mongodb.js:235](lib/mongodb.js#L235)) as part of the v7.0.0
+   driver upgrade.
 
-## Driver-version risk surface
+## Driver-version upgrade record (v4.6.x → v7.x, completed in v7.0.0)
 
-The pending `mongodb` driver upgrade from `4.6.x` to `7.x` will stress, in order of
-impact:
+The following surfaces were identified pre-upgrade and addressed in the v7.0.0 cutover:
 
-| # | Surface | File:Line | Why 7.x stresses it |
-|---|---------|-----------|---------------------|
-| 1 | Pool option rename | [lib/mongodb.js:238](lib/mongodb.js#L238) | `poolSize` removed in 6.x; must accept `maxPoolSize` / `minPoolSize`. |
-| 2 | `MongoClient` / `Db` init | [lib/mongodb.js:355](lib/mongodb.js#L355), [lib/mongodb.js:388](lib/mongodb.js#L388) | Stricter client lifecycle; some options moved or renamed. |
-| 3 | `disconnect()` | [lib/mongodb.js:2033-2055](lib/mongodb.js#L2033-L2055) | Stricter `MongoClient.close()` semantics; in-flight operations behave differently. |
-| 4 | Session merging | [lib/mongodb.js:2510](lib/mongodb.js#L2510) | Stricter session/transaction lifecycle; missing `endSession()` is now exhaustively tracked. |
-| 5 | Transactions (currently `describe.skip`) | [test/transaction.test.js](test/transaction.test.js) | We have no green baseline on 4.x, so 7.x regressions cannot be diffed. |
+| # | Surface | File:Line | Resolution |
+|---|---------|-----------|------------|
+| 1 | Pool option rename | [lib/mongodb.js:235](lib/mongodb.js#L235) | `poolSize` removed from allow-list; `maxPoolSize`/`minPoolSize` retained. |
+| 2 | `MongoClient` / `Db` init | [lib/mongodb.js:317](lib/mongodb.js#L317), [lib/mongodb.js:327](lib/mongodb.js#L327) | Promise-based `connect()`; `client.db()` inherits all options via `Object.assign`; `retryWrites` and peer options added to allow-list. |
+| 3 | `disconnect()` | [lib/mongodb.js:1915](lib/mongodb.js#L1915) | `client.close()` now awaited before nulling `db`/`client`; callback invoked after close settles. |
+| 4 | Session lifecycle | [lib/mongodb.js:2162](lib/mongodb.js#L2162) | `commit()`/`rollback()` always call `endSession()` even on transaction failure; `endSession()` now takes no arguments (v7 API). |
+| 5 | Transactions baseline | [test/transaction.test.js](test/transaction.test.js) | Suite un-skipped behind `TEST_TRANSACTIONS=1`; green baseline established on v4.x before upgrade. |
 
-None of these surfaces are tenant-specific in code — but all five are exactly the
-places that *under* the multi-tenant N-`DataSource` load shape are most likely to
-expose regressions that single-`DataSource` tests will miss.
+All five surfaces are resolved. The connector is on `mongodb ^7.2.0`.
 
 ## Test coverage map
 
@@ -121,9 +115,10 @@ expose regressions that single-`DataSource` tests will miss.
 | 2 — Independent lifecycle (`disconnect()` does not affect siblings) | [test/multitenant.test.js](test/multitenant.test.js) — `independent disconnect lifecycle` | ✅ Covered |
 | 3 — Concurrent lazy connect | [test/multitenant.test.js](test/multitenant.test.js) — `lazy connect under concurrent first-use` | ✅ Covered |
 | 4 — Session scoping across DataSources | [test/multitenant.test.js](test/multitenant.test.js) — `session/transaction scoping across DataSources` + [test/transaction.test.js](test/transaction.test.js) (opt-in via `TEST_TRANSACTIONS=1`, requires a local replica set) | ✅ Covered (full transaction semantics gated on replica-set infra) |
-| 5 — `maxPoolSize` flows through to the driver | [test/multitenant.test.js](test/multitenant.test.js) — `pool option compatibility` | ✅ Covered (legacy `poolSize` already broken on 4.6.x; remove stale allow-list entry in 7.x bump) |
+| 5 — `maxPoolSize` flows through to the driver | [test/multitenant.test.js](test/multitenant.test.js) — `pool option compatibility`; [test/mongodb.test.js](test/mongodb.test.js) — `should forward connector settings to MongoClient` | ✅ Covered; stale `poolSize` allow-list entry removed in v7.0.0 |
 | Upstream juggler multi-tenant invariants | [deps/juggler-v5/test.js](deps/juggler-v5/test.js) requires `tenant-aware-model-registry.test.js` + `multitenant-datasource-accessor.test.js` | ✅ Wired into `yarn test:juggler:v5` |
 | Connection/session leaks under N-DataSource churn | [leak-detection/mongodb.test.js](leak-detection/mongodb.test.js) — `multi-tenant DataSource churn` context | ✅ Covered (run via `make leak-detection`) |
+| `commit`/`rollback` session cleanup on error path | [test/mongodb.test.js](test/mongodb.test.js) — `commit and rollback session cleanup` describe block | ✅ Covered (no replica set required; injects failure on session object) |
 
 ## Out of scope
 

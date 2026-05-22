@@ -1,3 +1,72 @@
+# 2026-05-22, Version 7.0.0
+
+- feat: upgrade MongoDB Node.js driver from `^4.6.0` to `^7.2.0` (breaking
+  change — see below for migration notes)
+
+- fix: convert all driver callback API calls to Promise-based equivalents
+  (`connect`, `all/cursor.toArray`, `ping`, `commit`, `rollback`, `execute`
+  dispatcher). Preserves the public LoopBack callback API at every connector
+  method boundary using the established `.then(() => cb(), cb)` pattern.
+
+- fix: restore atomicity for `updateOrCreate`, `findOrCreate`, and
+  `upsertWithWhere` — each now uses a single `findOneAndUpdate` compound
+  operation (`returnDocument: 'after'`, `includeResultMetadata: true`) instead
+  of a split `updateOne` + `findOne` that introduced a race window under
+  concurrent writers.
+
+- fix: `findOrCreate` now correctly honours `filter.order` when multiple
+  documents match — the `sort` built from `filter.order` is passed to the
+  `findOneAndUpdate` call so the first matching document by sort order is
+  returned, not an arbitrary match.
+
+- fix: `commit()` and `rollback()` now always call `endSession()` even when
+  `commitTransaction()` / `abortTransaction()` rejects. Previously, a
+  transaction-level error would leave the session open (resource leak).
+
+- fix: remove private internal import
+  `require('mongodb/lib/connection_string').parseOptions` (removed in v5);
+  replaced with `new URL(url).pathname` which was already present at the
+  same call site.
+
+- fix: add `retryWrites`, `retryReads`, `checkKeys`, `fieldsAsRaw`,
+  `bsonRegExp` to the connector option allow-list so they are forwarded to
+  `MongoClient`. Removes stale v4 options (`poolSize`, `autoReconnect`,
+  `reconnectTries`, `reconnectInterval`, `useNewUrlParser`, `useUnifiedTopology`,
+  `bufferMaxEntries`, `promiseLibrary`, `domainsEnabled`, `numberOfRetries`,
+  `auto_reconnect`, `minSize`) that the v7 driver rejects.
+
+- fix: `save()` — replace `result.ops[0]` (removed in v5) with the `data`
+  object that was already in scope.
+
+- fix: `updateAttributes()` — `findOneAndUpdate` now returns the document
+  directly in v7 (no `result.value` wrapper); callback receives the document
+  directly.
+
+- chore: version bump 6.6.0 → 7.0.0 (breaking: drops Node.js driver v4,
+  removes legacy connection options, requires MongoDB Server ≥ 4.0)
+
+- test: add gap-closing unit tests for previously uncovered regressions:
+  `findOrCreate` sort semantics with multiple matches; `isNewInstance`/`created`
+  flag via `after save` hook on both create and update paths; `upsertWithWhere`
+  deterministic target selection with multiple matches; `connect()` option
+  propagation (`retryWrites`, `writeConcern`) verified against `client.options`;
+  `commit`/`rollback` error-path session cleanup (no replica set required).
+
+### Migration notes (v6.x → v7.0.0)
+
+- **Node.js driver**: `mongodb ^4.6.0` → `mongodb ^7.2.0`. If your application
+  pins the driver directly, update accordingly.
+- **Removed connection options**: `poolSize` (use `maxPoolSize`),
+  `autoReconnect`, `reconnectTries`, `reconnectInterval`, `useNewUrlParser`,
+  `useUnifiedTopology`, `bufferMaxEntries`, `promiseLibrary`, `domainsEnabled`,
+  `numberOfRetries`, `auto_reconnect`, `minSize`. These were silently ignored or
+  rejected by the v4 driver already; v7 never sees them.
+- **MongoDB Server requirement**: v7 driver requires MongoDB Server ≥ 4.0.
+  MongoDB 3.x is no longer supported.
+- **No public API changes**: every connector method that accepted a callback
+  before still accepts a callback and returns the same arguments. The upgrade is
+  internal-only from the LoopBack application perspective.
+
 # 2026-05-22, Version 6.6.0
 
 - feat: multi-tenant test hardening — new `test/multitenant.test.js` suite

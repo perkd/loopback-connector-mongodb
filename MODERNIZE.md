@@ -12,8 +12,9 @@ Brings the connector's tooling and source patterns into line with the modernizat
 | Phase 4 | Docs and version bump                                                                               | COMPLETED (v6.5.0)                                    |
 | Phase 5 | Drop `sinon` devDependency; replace stubs/spies with native counter pattern                         | COMPLETED (v6.5.0)                                    |
 | Phase 6 | Replace `memwatch-next` (broken on Node 22+) with native `v8`/`--expose-gc` heap-growth detector; add multi-tenant leak scenario | COMPLETED (v6.6.0)                                    |
+| Phase 7 | MongoDB driver upgrade `^4.6.0` → `^7.2.0`; direct cutover of all callback API sites; restore compound-operation atomicity | COMPLETED (v7.0.0)                                    |
 
-The MongoDB driver remains on 4.6.x; the 7.x upgrade is the next planned effort (see [MULTITENANT.md](MULTITENANT.md) for the pre-upgrade test-hardening contract).
+The MongoDB driver is now on `^7.2.0`. The pre-upgrade test-hardening contract is documented in [MULTITENANT.md](MULTITENANT.md).
 
 ---
 
@@ -149,6 +150,80 @@ None intended.
 **Added**: `eslint.config.js`, `.c8rc.json`, `MODERNIZE.md`.
 **Removed**: `.eslintrc`, `.eslintignore`, `.travis.yml`.
 **Untracked from git** (still on disk, gitignored): `.yarn/install-state.gz`.
+
+## Phase 7 — MongoDB driver `^4.6.0` → `^7.2.0` (v7.0.0)
+
+Direct cutover. No `mongodb-legacy`, no adapter classes, no global compat shims. Every
+site rewritten in place. Public callback API is unchanged — the established Phase 3
+pattern (`.then(() => cb(), cb)`) terminates every Promise chain at the LoopBack
+boundary.
+
+### Principles applied
+
+Same direct-cutover philosophy as Phase 2: *"No compat shims, no polyfill, no wrapper
+utility — each pattern is rewritten in place."* The only targeted flag added is
+`includeResultMetadata: true` at the three compound-operation sites that need
+`isNewInstance`/`created` — this is the documented v7 API for compound operations, not
+a shim.
+
+### Breaking changes in the driver (and how each is addressed)
+
+| Change | Driver version | Fix in `lib/mongodb.js` |
+|---|---|---|
+| Callbacks removed across all collection/cursor/session methods | v5.0.0 | All 9 callback sites converted to Promise chains |
+| `result.ops` removed from insert result | v5.0.0 | `save()`: `result.ops[0]` → `data` (already in scope) |
+| `findOneAndUpdate/Replace/Delete` returns document directly (no `{value, lastErrorObject}`) | v6.0.0 | `updateOrCreate`, `findOrCreate`, `upsertWithWhere`: add `includeResultMetadata: true`; `updateAttributes`: receives document directly, no change needed |
+| Private import `mongodb/lib/connection_string` removed | v5.0.0 | Replaced with `new URL(url).pathname.replace(/^\//, '')` |
+| `db.topology.isDestroyed()` private API removed | v5.0.0 | `execute()` reconnect guard replaced with `if (self.db)` truthiness check |
+| Stale option names rejected (`poolSize`, `autoReconnect`, etc.) | v5.0.0 | Removed from `validOptionNames`; added `retryWrites`, `retryReads`, `checkKeys`, `fieldsAsRaw`, `bsonRegExp` |
+| `endSession()` takes no arguments | v7.0.0 | `commit()`/`rollback()`: `endSession(null, cb)` → `endSession()` in Promise chain |
+
+### Atomicity restorations
+
+The initial migration split compound operations into `updateOne` + `findOne`, which
+introduced a race window under concurrent writers. All three sites were restored to
+single atomic `findOneAndUpdate` calls:
+
+- **`updateOrCreate`** ([lib/mongodb.js:876](lib/mongodb.js#L876)): single
+  `findOneAndUpdate({upsert:true, returnDocument:'after', includeResultMetadata:true})`.
+  `isNewInstance` derived from `lastErrorObject.updatedExisting`.
+- **`findOrCreate`** ([lib/mongodb.js:1535](lib/mongodb.js#L1535)): single
+  `findOneAndUpdate({$setOnInsert, upsert:true, returnDocument:'after', sort, includeResultMetadata:true})`.
+  `created` derived from `lastErrorObject.updatedExisting`. `filter.order` sort is now
+  correctly applied (was computed but discarded in the split-operation version).
+- **`upsertWithWhere`** ([lib/mongodb.js:1896](lib/mongodb.js#L1896)): single
+  `findOneAndUpdate({upsert:true, returnDocument:'after', sort:{_id:1}, includeResultMetadata:true})`.
+  Restores the atomic sort + update semantics of the original.
+
+### Session cleanup fix
+
+`commit()` and `rollback()` ([lib/mongodb.js:2162](lib/mongodb.js#L2162)) now use a
+capture-then-always-end pattern: the transaction error is captured in a local variable,
+`endSession()` is called unconditionally, then the original error (if any) is forwarded
+to `cb`. The previous chained `.then` structure skipped `endSession()` on the failure
+path.
+
+### Test gaps closed (new in v7.0.0)
+
+Five gaps identified by code review that no existing test covered:
+
+| Gap | Test added |
+|---|---|
+| `findOrCreate` ignores `filter.order` with multiple matches | `findOrCreate should honour filter.order when multiple documents match` |
+| `isNewInstance`/`created` never asserted on update/create paths | `updateOrCreate should report isNewInstance=false/true via after save hook` |
+| `upsertWithWhere` non-deterministic target with multiple matches | `upsertWithWhere should update the first matching instance (lowest _id)` |
+| `connect()` options not verified to reach `MongoClient` | `should forward connector settings to MongoClient (retryWrites, writeConcern)` |
+| `commit`/`rollback` session leak on error path | `commit/rollback session cleanup` describe block (no replica set required) |
+
+### Verification
+
+| Suite | Passing | Pending | Failing |
+|---|---|---|---|
+| `test:unit` | 250 | 0 | 0 |
+| `test:juggler` (v4) | 1045 | 113 | 0 |
+| `test:juggler:v5` (perkd v5) | 1088 | 113 | 0 |
+
+---
 
 ## Phase N — juggler-v5 mirror suite + v4 freeze documentation
 
