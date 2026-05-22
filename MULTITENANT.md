@@ -87,10 +87,14 @@ coverage map* below.
    that opened them. Session merging in `buildOptions()`
    ([lib/mongodb.js:2510](lib/mongodb.js#L2510)) never leaks a session from
    DataSource A into an operation on DataSource B.
-5. **Pool option compatibility.** Both `poolSize` (legacy, mongodb 4.x) and
-   `maxPoolSize` (mongodb 6.x+) are accepted at
-   [lib/mongodb.js:238](lib/mongodb.js#L238). Consumers can write either and get the
-   expected pool size regardless of underlying driver version.
+5. **Pool sizing via `maxPoolSize` works end-to-end.** Consumers can set
+   `maxPoolSize` / `minPoolSize` and have them honored by the underlying driver.
+   Note: the connector's option allow-list at
+   [lib/mongodb.js:238](lib/mongodb.js#L238) still names the legacy `poolSize`,
+   but the `mongodb` 4.6.x driver itself rejects it
+   (`MongoParseError: option poolsize is not supported`); only `maxPoolSize`
+   actually flows through. This stale allow-list entry should be removed as part
+   of the 7.x upgrade.
 
 ## Driver-version risk surface
 
@@ -111,24 +115,15 @@ expose regressions that single-`DataSource` tests will miss.
 
 ## Test coverage map
 
-Status today is **provisional**. The N-DataSource load shape is not currently
-exercised by this repo's test suite, and the perkd juggler fork's 75 multi-tenant
-tests live in `node_modules/loopback-datasource-juggler/test/*tenant*.test.js` but
-are **not** pulled into our CI by [`deps/juggler-v5/test.js`](deps/juggler-v5/test.js).
-The plan to close these gaps is `~/.claude/plans/do-you-have-effective-curried-papert.md`.
-
 | Contract item | Covered by | Status |
 |---|---|---|
-| 1 — Isolation across N concurrent DataSources | `test/multitenant.test.js` (TODO — step 2) | **NOT YET COVERED** |
-| 2 — Independent lifecycle (`disconnect()` does not affect siblings) | `test/multitenant.test.js` (TODO — step 2) | **NOT YET COVERED** |
-| 3 — Concurrent lazy connect | `test/multitenant.test.js` (TODO — step 2) | **NOT YET COVERED** |
-| 4 — Session scoping across DataSources | `test/multitenant.test.js` (TODO — step 2) + `test/transaction.test.js` (TODO — step 4: un-skip) | **NOT YET COVERED** |
-| 5 — Pool option compatibility (`poolSize` and `maxPoolSize`) | `test/multitenant.test.js` (TODO — step 2) | **NOT YET COVERED** |
-| Upstream juggler multi-tenant invariants | `deps/juggler-v5/test.js` requiring `tenant-aware-model-registry.test.js` and `multitenant-datasource-accessor.test.js` (TODO — step 1) | **NOT YET WIRED INTO CI** |
-| Connection/session leaks under N-DataSource churn | `leak-detection/mongodb.test.js` extension (TODO — step 3) | **NOT YET COVERED** |
-
-Once each step lands, the corresponding row should be updated with the file and case
-that proves it.
+| 1 — Isolation across N concurrent DataSources | [test/multitenant.test.js](test/multitenant.test.js) — `isolation across N concurrent DataSources` | ✅ Covered |
+| 2 — Independent lifecycle (`disconnect()` does not affect siblings) | [test/multitenant.test.js](test/multitenant.test.js) — `independent disconnect lifecycle` | ✅ Covered |
+| 3 — Concurrent lazy connect | [test/multitenant.test.js](test/multitenant.test.js) — `lazy connect under concurrent first-use` | ✅ Covered |
+| 4 — Session scoping across DataSources | [test/multitenant.test.js](test/multitenant.test.js) — `session/transaction scoping across DataSources` + [test/transaction.test.js](test/transaction.test.js) (opt-in via `TEST_TRANSACTIONS=1`, requires a local replica set) | ✅ Covered (full transaction semantics gated on replica-set infra) |
+| 5 — `maxPoolSize` flows through to the driver | [test/multitenant.test.js](test/multitenant.test.js) — `pool option compatibility` | ✅ Covered (legacy `poolSize` already broken on 4.6.x; remove stale allow-list entry in 7.x bump) |
+| Upstream juggler multi-tenant invariants | [deps/juggler-v5/test.js](deps/juggler-v5/test.js) requires `tenant-aware-model-registry.test.js` + `multitenant-datasource-accessor.test.js` | ✅ Wired into `yarn test:juggler:v5` |
+| Connection/session leaks under N-DataSource churn | [leak-detection/mongodb.test.js](leak-detection/mongodb.test.js) — `multi-tenant DataSource churn` context | ✅ Covered (run via `make leak-detection`) |
 
 ## Out of scope
 

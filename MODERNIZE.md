@@ -11,8 +11,9 @@ Brings the connector's tooling and source patterns into line with the modernizat
 | Phase 3 | Drop `async` package; rewrite `autoupdate` / `automigrate` to native `for…of` + `await`             | COMPLETED (v6.4.0)                                    |
 | Phase 4 | Docs and version bump                                                                               | COMPLETED (v6.5.0)                                    |
 | Phase 5 | Drop `sinon` devDependency; replace stubs/spies with native counter pattern                         | COMPLETED (v6.5.0)                                    |
+| Phase 6 | Replace `memwatch-next` (broken on Node 22+) with native `v8`/`--expose-gc` heap-growth detector; add multi-tenant leak scenario | COMPLETED (v6.6.0)                                    |
 
-The MongoDB driver remains on 4.6.x; the 6.x upgrade is a separate effort.
+The MongoDB driver remains on 4.6.x; the 7.x upgrade is the next planned effort (see [MULTITENANT.md](MULTITENANT.md) for the pre-upgrade test-hardening contract).
 
 ---
 
@@ -24,6 +25,35 @@ sinon was the last external test-only dependency remaining after the Phase 2 fra
 - **`memwatch` event spies** (`leak-detection/mongodb.test.js`, `leak-detection/leak-detector.test.js`): replaced with a plain `let leakCount` counter incremented by an arrow function listener. `spy.called` → `leakCount > 0`, `spy.reset()` → `leakCount = 0`.
 
 `"sinon": "^12.0.1"` removed from `devDependencies`. The main test suite now has zero external test dependencies.
+
+## Phase 6 — Replace `memwatch-next` with native heap-growth detector
+
+`memwatch-next` and `@airbnb/node-memwatch` are native (`node-gyp`) modules that stopped building on Node 22+. The entire leak-detection harness was broken as a result.
+
+Replaced with [`leak-detection/heap-leak.js`](leak-detection/heap-leak.js) — a zero-dependency detector built on `v8.getHeapStatistics()` + `global.gc()` (exposed via `--expose-gc`). Detection logic: take a heap snapshot after a forced GC at each iteration; if the median of the later half of samples exceeds the median of the earlier half by more than 2 MB, report a leak. Rolling window of 20 samples; minimum 10 before judging.
+
+Changes:
+- `leak-detection/heap-leak.js` — new detector module (`createDetector()`)
+- `leak-detection/mongodb.test.js` — `require('memwatch-next')` → `require('./heap-leak')`, `leakCount` counter pattern → `detector.start()` / `detector.sample()` / `detector.leaked()`; also added `multi-tenant DataSource churn` context (step 3 of multi-tenant hardening)
+- `leak-detection/leak-detector.test.js` — same replacement; self-test still verifies the detector catches a real allocation leak
+- `Makefile` — dropped `npm i @airbnb/node-memwatch --no-save || npm i memwatch-next --no-save` install step; added `--node-option=expose-gc` to mocha invocation
+
+The leak-detection suite now runs cleanly on Node 22+ with no native module installation. Tradeoff vs `memwatch-next`: the heap-growth detector is coarser — it catches sustained multi-megabyte growth across iterations but not small per-call leaks. Increase `ITERATIONS` for higher confidence (`ITERATIONS=500 make leak-detection`).
+
+### Verification
+
+`ITERATIONS=30 make leak-detection` (Node 22, macOS):
+
+| Test | Result |
+|---|---|
+| `leak detector › should detect a basic leak` | ✔ passing |
+| `mongodb › find › should not leak when retrieving a specific item` | ✔ passing |
+| `mongodb › find › should not leak when retrieving all items` | ✔ passing |
+| `mongodb › create › should not leak when creating an item` | ✔ passing |
+| `mongodb › create › should not leak when creating multiple items` | ✔ passing |
+| `mongodb › multi-tenant DataSource churn › should not leak when DataSources are created and disconnected in a loop` | ✔ passing |
+
+6 passing, 0 failing.
 
 ---
 

@@ -1,3 +1,34 @@
+# 2026-05-22, Version 6.6.0
+
+- feat: multi-tenant test hardening — new `test/multitenant.test.js` suite
+  proving isolation, independent lifecycle, concurrent lazy-connect, session
+  scoping, and pool-option compatibility across N concurrent DataSource
+  instances. Contracts documented in `MULTITENANT.md`.
+
+- feat: wire perkd juggler-v5 multi-tenant suites into CI — `deps/juggler-v5/test.js`
+  now requires `tenant-aware-model-registry.test.js` and
+  `multitenant-datasource-accessor.test.js` from the perkd juggler fork.
+  `test:juggler:v5` now runs 1088 tests (was 1041).
+
+- fix: replace broken `memwatch-next` / `@airbnb/node-memwatch` (native
+  modules that no longer build on Node 22+) with a zero-dependency
+  `v8.getHeapStatistics()` + `global.gc()` heap-growth detector in
+  `leak-detection/heap-leak.js`. Makefile drops the `npm i memwatch-*`
+  install step and adds `--node-option=expose-gc`. Leak-detection suite
+  was completely non-functional on Node 22+ prior to this fix.
+
+- feat: add multi-tenant DataSource churn scenario to `leak-detection/mongodb.test.js`
+  — 6 leak-detection tests now passing (was 0 runnable).
+
+- feat: un-skip `test/transaction.test.js` behind `TEST_TRANSACTIONS=1` env
+  guard; add `test:transactions` npm script. Requires a local MongoDB
+  replica set (`run-rs -v 4.2.0 --host localhost --portStart 27000`).
+
+- fix: discovered that `poolSize` in the connector option allow-list
+  (`lib/mongodb.js:238`) is already rejected by the `mongodb@4.6.x` driver
+  (`MongoParseError: option poolsize is not supported`). Documented in
+  `MULTITENANT.md`; stale entry to be removed in the 7.x driver upgrade.
+
 # 2026-05-22, Version 6.5.0
 
 - chore: remove `sinon` devDependency; replace the three `console.error`
