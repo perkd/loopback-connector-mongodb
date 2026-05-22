@@ -552,8 +552,8 @@ describe('mongodb connector', function() {
     db.automigrate('User', function() {
       db.connector.db
         .collection('User')
-        .indexInformation(function(err, result) {
-          if (err) return reject(err);
+        .indexInformation()
+        .then(function(result) {
           /* eslint-disable camelcase */
           const indexes = {
             _id_: [['_id', 1]],
@@ -565,44 +565,45 @@ describe('mongodb connector', function() {
           /* eslint-enable camelcase */
           assert.deepStrictEqual(indexes, result);
           resolve();
-        });
+        })
+        .catch(reject);
     });
   }));
 
   it('should create complex indexes', () => new Promise((resolve, reject) => {
     db.automigrate('Superhero', function() {
-      db.connector.db.collection('sh').indexInformation(function(err, result) {
-        if (err) return reject(err);
-        /* eslint-disable camelcase */
-        const indexes = {
-          _id_: [['_id', 1]],
-          geojson_location_geometry: [['location.geometry', '2dsphere']],
-          power_1: [['power', 1]],
-          name_1: [['name', 1]],
-          address_1: [['address', 1]],
-        };
-        /* eslint-enable camelcase */
-
-        assert.deepStrictEqual(indexes, result);
-        resolve();
-      });
+      db.connector.db.collection('sh').indexInformation()
+        .then(function(result) {
+          /* eslint-disable camelcase */
+          const indexes = {
+            _id_: [['_id', 1]],
+            geojson_location_geometry: [['location.geometry', '2dsphere']],
+            power_1: [['power', 1]],
+            name_1: [['name', 1]],
+            address_1: [['address', 1]],
+          };
+          /* eslint-enable camelcase */
+          assert.deepStrictEqual(indexes, result);
+          resolve();
+        })
+        .catch(reject);
     });
   }));
 
   it('should create case insensitive indexes', () => new Promise((resolve, reject) => {
     db.automigrate('Category', function() {
-      db.connector.db.collection('Category').indexes(function(err, result) {
-        if (err) return reject(err);
-        const indexes = [
-          {name: '_id_', key: {_id: 1}},
-          {name: 'title_1', key: {title: 1}},
-          {name: 'title_case_insensitive', key: {title: 1}, collation: {locale: 'en', strength: 1}},
-          {name: 'posts_1', key: {posts: 1}},
-        ];
-
-        __CONTAIN_FN__(result, indexes);
-        resolve();
-      });
+      db.connector.db.collection('Category').indexes()
+        .then(function(result) {
+          const indexes = [
+            {name: '_id_', key: {_id: 1}},
+            {name: 'title_1', key: {title: 1}},
+            {name: 'title_case_insensitive', key: {title: 1}, collation: {locale: 'en', strength: 1}},
+            {name: 'posts_1', key: {posts: 1}},
+          ];
+          __CONTAIN_FN__(result, indexes);
+          resolve();
+        })
+        .catch(reject);
     });
   }));
 
@@ -860,13 +861,15 @@ describe('mongodb connector', function() {
       err,
       post,
     ) {
+      if (err) return reject(err);
       Post.dataSource.connector.db
         .collection('PostCollection')
-        .findOne({_id: post.id}, function(err, p) {
-          assert.ok(err == null);
+        .findOne({_id: post.id})
+        .then(function(p) {
           assert.ok(p != null);
           resolve();
-        });
+        })
+        .catch(reject);
     });
   }));
 
