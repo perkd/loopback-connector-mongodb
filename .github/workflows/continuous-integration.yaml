@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     strategy:
       matrix:
-        node-version: [18, 19, 20, 21]
+        node-version: [22, 24]
         mongodb-version:
           - '4.4'
           - '5.0'
@@ -29,25 +29,21 @@ jobs:
           - '7.0'
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+      - name: Enable Corepack
+        run: corepack enable
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.8.0
         with:
           mongodb-version: ${{ matrix.mongodb-version }}
       - name: Bootstrap project
-        run: npm ci --ignore-scripts
-      - name: Update NPM (Node.js v10)
-        if: matrix.node-version == 10
-        run: npm install --global npm@7
-      - name: Update NPM
-        if: matrix.node-version != 10
-        run: npm install --global npm@8
+        run: yarn install --immutable
       - name: Run tests
-        run: npm test --ignore-scripts
+        run: yarn test
       - name: Publish coverage report to Coveralls
         uses: coverallsapp/github-action@master
         with:
@@ -71,31 +67,35 @@ jobs:
     name: Code Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js 16
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
+      - name: Enable Corepack
+        run: corepack enable
       - name: Bootstrap project
-        run: npm ci --ignore-scripts
+        run: yarn install --immutable
       - name: Verify code linting
-        run: npm run lint
+        run: yarn lint
 
   commit-lint:
     name: Commit Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Use Node.js 16
-        uses: actions/setup-node@v3
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 22
+      - name: Enable Corepack
+        run: corepack enable
       - name: Bootstrap project
-        run: npm ci --ignore-scripts
+        run: yarn install --immutable
       - name: Verify commit linting
-        run: npx --no-install commitlint --from origin/master --to HEAD --verbose
+        run: yarn dlx commitlint --from origin/master --to HEAD --verbose
 
   codeql:
     name: CodeQL
@@ -105,13 +105,13 @@ jobs:
       security-events: write
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
+      uses: github/codeql-action/init@v3
       with:
         languages: 'javascript'
         config-file: ./.github/codeql/codeql-config.yml
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+      uses: github/codeql-action/analyze@v3
