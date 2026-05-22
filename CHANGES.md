@@ -1,3 +1,26 @@
+# 2026-05-22, Version 6.5.0
+
+- chore: remove `sinon` devDependency; replace the three `console.error`
+  stubs in `test/mongodb.test.js` and the two `memwatch` event spies in
+  `leak-detection/` with plain counter variables. Zero external test
+  dependencies remain in the main suite.
+
+- feat: add `createAll` bulk-insert method via `insertMany` and set
+  `multiInsertSupported = true` so juggler uses the optimized path instead
+  of falling back to parallel `create()` calls. Also fixes a pre-existing
+  null-id check in `create` (`=== null` → `== null`) so `undefined` ids are
+  also treated as auto-generated.
+
+- test: migrate own test suite from `mocha` + `should` + `nyc` to Node's
+  built-in test runner (`node --test` + `node:assert/strict` + `c8`).
+  Conversion is a direct cutover with no compat shims: all 7 test files
+  rewritten, ~880 `should.*` assertions translated to `assert`,
+  ~199 `function(done)` test bodies promisified to `() => new Promise(...)`,
+  `async.parallel` test-side usage rewritten to `Promise.all`,
+  `bluebird.promisify` replaced with `util.promisify`. `should` and
+  `nyc` removed from devDependencies; `mocha` retained for the external
+  juggler-v4 suite (`test:juggler`) only.
+
 # 2026-05-22, Version 6.4.0
 
 - chore: modernize tooling (ESLint 10 flat config, eslint-config-loopback 14,
