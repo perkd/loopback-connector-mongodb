@@ -1,0 +1,8 @@
+{
+  "name": "juggler-v5",
+  "version": "5.0.0",
+  "dependencies": {
+    "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^5.2.11",
+    "should": "^13.2.3"
+  }
+}

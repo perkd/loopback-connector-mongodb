@@ -55,4 +55,5 @@ global.connectorCapabilities = {
   nilike: false,
   nestedProperty: true,
   atomicUpsertWithWhere: true,
+  supportInq: true,
 };
