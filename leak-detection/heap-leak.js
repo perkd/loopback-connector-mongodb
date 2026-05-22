@@ -14,7 +14,7 @@
 
 const v8 = require('node:v8');
 
-const SAMPLE_WINDOW = 20;        // rolling samples used for trend analysis
+const SAMPLE_WINDOW = 20; // rolling samples used for trend analysis
 const MIN_SAMPLES_TO_JUDGE = 10; // need at least this many before claiming a leak
 const GROWTH_THRESHOLD_BYTES = 2 * 1024 * 1024; // 2 MB sustained growth = leak
 
