@@ -1,6 +1,6 @@
 {
   "name": "loopback-connector-mongodb",
-  "version": "6.5.1",
+  "version": "7.0.0",
   "description": "The official MongoDB connector for the LoopBack framework.",
   "engines": {
     "node": ">=22"
@@ -19,7 +19,8 @@
     "coverage:lcov": "c8 report --reporter=lcov",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "posttest": "yarn lint"
+    "posttest": "yarn lint",
+    "reinstall": "(rm -rf node_modules/ || true) && (rm yarn.lock || true) && yarn install"
   },
   "files": [
     "intl",
@@ -47,7 +48,7 @@
   "dependencies": {
     "debug": "^4.4.3",
     "loopback-connector": "5.3.3",
-    "mongodb": "^4.6.0",
+    "mongodb": "^7.2.0",
     "strong-globalize": "^6.0.6"
   },
   "devDependencies": {
@@ -61,7 +62,7 @@
     "globals": "^17.6.0",
     "juggler-v4": "file:./deps/juggler-v4",
     "juggler-v5": "file:./deps/juggler-v5",
-    "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^5.2.11",
+    "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^5.2.12",
     "mocha": "^11.7.6",
     "rc": "^1.2.8",
     "semver": "^7.8.1"
