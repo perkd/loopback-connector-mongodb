@@ -4,12 +4,12 @@ Brings the connector's tooling and source patterns into line with the modernizat
 
 ## Status
 
-| Phase | Scope | Status |
-|---|---|---|
-| Phase 1 | Tooling baseline — ESLint 10 flat config, c8 coverage, Yarn 4, CI/Actions bumps, drop `.travis.yml` | COMPLETED (v7.0.0-alpha.3) |
-| Phase 2 | Test framework migration — `mocha + should + nyc` → `node --test` + `node:assert` + `c8` | DEFERRED — separate effort, see "Phase 2 notes" below |
-| Phase 3 | Drop `async` package; rewrite `autoupdate` / `automigrate` to native `for…of` + `await` | COMPLETED (v7.0.0-alpha.3) |
-| Phase 4 | Docs and version bump | COMPLETED (v7.0.0-alpha.3) |
+| Phase   | Scope                                                                                               | Status                                                |
+| ------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Phase 1 | Tooling baseline — ESLint 10 flat config, c8 coverage, Yarn 4, CI/Actions bumps, drop `.travis.yml` | COMPLETED (v6.4.0)                                    |
+| Phase 2 | Test framework migration — `mocha + should + nyc` → `node --test` + `node:assert` + `c8`            | DEFERRED — separate effort, see "Phase 2 notes" below |
+| Phase 3 | Drop `async` package; rewrite `autoupdate` / `automigrate` to native `for…of` + `await`             | COMPLETED (v6.4.0)                                    |
+| Phase 4 | Docs and version bump                                                                               | COMPLETED (v6.4.0)                                    |
 
 The MongoDB driver remains on 4.6.x; the 6.x upgrade is a separate effort.
 
@@ -29,7 +29,7 @@ The MongoDB driver remains on 4.6.x; the 6.x upgrade is a separate effort.
 
 ## Phase 2 — Deferred
 
-Migrating the seven test files (~5 300 lines) from `mocha + should` chained assertions to `node --test` + `node:assert` is a substantial mechanical sweep with real regression risk against 230+ currently-passing tests. It is intentionally **not** part of v7.0.0-alpha.3 and will be tracked separately. The Phase 1 c8/Yarn changes keep the existing mocha-based tests runnable in the meantime; the conversion mapping is documented in the modernization plan.
+Migrating the seven test files (~5 300 lines) from `mocha + should` chained assertions to `node --test` + `node:assert` is a substantial mechanical sweep with real regression risk against 230+ currently-passing tests. It is intentionally **not** part of v6.4.0 and will be tracked separately. The Phase 1 c8/Yarn changes keep the existing mocha-based tests runnable in the meantime; the conversion mapping is documented in the modernization plan.
 
 ## Phase 3 — Drop the `async` package
 
@@ -42,15 +42,15 @@ Migrating the seven test files (~5 300 lines) from `mocha + should` chained asse
 
 End-to-end smoke test of the rewritten paths against MongoDB 6.0:
 
-| Scenario | Result |
-|---|---|
-| `automigrate` on a missing collection | OK — `ns not found` swallowed, collection created |
-| `automigrate` after inserting a row | OK — collection dropped and recreated, row gone |
-| `autoupdate` after inserting a row | OK — data preserved, indexes created (model-level + property-level) |
+| Scenario                              | Result                                                              |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| `automigrate` on a missing collection | OK — `ns not found` swallowed, collection created                   |
+| `automigrate` after inserting a row   | OK — collection dropped and recreated, row gone                     |
+| `autoupdate` after inserting a row    | OK — data preserved, indexes created (model-level + property-level) |
 
-Unit test suite: **232 passing, 14 pending, 3 failing**. The 3 failures (`updateAll extended operators ...`) exist on master prior to this work — they timeout against MongoDB 6 because the test asserts a specific server error for `$rename` validation that the local Mongo image does not surface.
+Unit test suite: **235 passing, 14 pending, 0 failing**. The 3 prior `updateAll extended operators` failures were fixed by switching the brittle exact-message assertion (`is not valid for storage.`) to a regex match — MongoDB 6 reports the same error with different wording (`is not allowed in the context of an update's replacement document`). The thrown `AssertionError` had been silently absorbed by juggler's promise chain, surfacing as a mocha timeout rather than a clean failure.
 
-Juggler-v4 suite: **1033 passing, 117 pending, 8 failing**. The 8 failures are all in `PersistedModel.createAll` (bulk insert) and trace through `lib/mongodb.js:685` — code untouched by Phase 3 — into juggler-v4's own assertion mismatch (`expected Array [ Error ] to equal Error`). Pre-existing.
+Juggler-v4 suite (observed locally against MongoDB 6.0 on Node 24): **1040 passing, 117 pending, 1 failing**. Exact counts may shift on other Node/MongoDB combinations. The 8 prior `PersistedModel.createAll` failures were fixed by implementing `MongoDB.prototype.createAll` (bulk insert via `insertMany`) and setting `multiInsertSupported = true` — previously the upstream juggler fell back to parallel `create()` calls, producing array-shaped errors and wrong hook order. The remaining failure (`hasMany through ... returns patient where id equal to samplePatientId`) is a juggler `lib/scope.js:144` bug: `_.isEmpty(ObjectId)` returns `true` for any single-element id intersection that resolves to an ObjectId, short-circuiting the relation query to `[]`. Not fixable from the connector.
 
 ## Breaking changes
 
