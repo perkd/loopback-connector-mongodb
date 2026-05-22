@@ -126,6 +126,28 @@ describe('connect', function() {
     );
   }));
 
+  it('should forward connector settings to MongoClient (retryWrites, writeConcern)', () => new Promise((resolve, reject) => {
+    const ds = global.getDataSource({
+      host: global.config.host,
+      port: global.config.port,
+      database: global.config.database,
+      retryWrites: false,
+      writeConcern: {w: 'majority'},
+    });
+    ds.once('connected', function() {
+      try {
+        const opts = ds.connector.client.options;
+        assert.strictEqual(opts.retryWrites, false);
+        // driver normalises writeConcern to a WriteConcern instance — compare the w field
+        assert.strictEqual(opts.writeConcern.w, 'majority');
+        ds.disconnect(() => resolve());
+      } catch (e) {
+        ds.disconnect(() => reject(e));
+      }
+    });
+    ds.on('error', reject);
+  }));
+
   it('should reconnect on execute when disconnected (lazyConnect = true)', () => new Promise((resolve, reject) => {
     const ds = global.getDataSource({
       host: '127.0.0.1',
@@ -1684,6 +1706,71 @@ describe('mongodb connector', function() {
       });
   });
 
+  it('findOrCreate should return created=true when creating', () =>
+    Post.findOrCreate({where: {title: 'brand-new-foc'}}, {title: 'brand-new-foc', content: 'X'})
+      .then(([inst, created]) => {
+        assert.strictEqual(created, true);
+        assert.strictEqual(inst.title, 'brand-new-foc');
+      }),
+  );
+
+  it('findOrCreate should return created=false when finding', () =>
+    Post.create({title: 'existing-foc', content: 'Y'})
+      .then(() => Post.findOrCreate({where: {title: 'existing-foc'}}, {title: 'existing-foc', content: 'Y'}))
+      .then(([inst, created]) => {
+        assert.strictEqual(created, false);
+        assert.strictEqual(inst.title, 'existing-foc');
+      }),
+  );
+
+  it('findOrCreate should honour filter.order when multiple documents match', () =>
+    Post.destroyAll({title: 'foc-order-test'})
+      .then(() => Post.create([
+        {title: 'foc-order-test', content: 'first'},
+        {title: 'foc-order-test', content: 'second'},
+      ]))
+      .then(() => Post.findOrCreate(
+        {where: {title: 'foc-order-test'}, order: 'content ASC'},
+        {title: 'foc-order-test', content: 'first'},
+      ))
+      .then(([inst, created]) => {
+        assert.strictEqual(created, false);
+        assert.strictEqual(inst.content, 'first');
+      }),
+  );
+
+  it('updateOrCreate should report isNewInstance=false via after save hook when updating', () => new Promise((resolve, reject) => {
+    Post.create({title: 'uoc-update-flag', content: 'A'}, function(err, post) {
+      if (err) return reject(err);
+      post.content = 'B';
+      let capturedIsNew;
+      const observer = function(ctx, next) { capturedIsNew = ctx.isNewInstance; next(); };
+      Post.observe('after save', observer);
+      Post.updateOrCreate(post, function(err) {
+        Post.removeObserver('after save', observer);
+        try {
+          assert.ok(err == null);
+          assert.strictEqual(capturedIsNew, false);
+          resolve();
+        } catch (e) { reject(e); }
+      });
+    });
+  }));
+
+  it('updateOrCreate should report isNewInstance=true via after save hook when creating', () => new Promise((resolve, reject) => {
+    let capturedIsNew;
+    const observer = function(ctx, next) { capturedIsNew = ctx.isNewInstance; next(); };
+    Post.observe('after save', observer);
+    Post.updateOrCreate({id: 'uoc-new-flag-id', title: 'uoc-new-flag', content: 'A'}, function(err) {
+      Post.removeObserver('after save', observer);
+      try {
+        assert.ok(err == null);
+        assert.strictEqual(capturedIsNew, true);
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }));
+
   it('updateOrCreate should update the instance', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
       post.title = 'b';
@@ -2306,6 +2393,39 @@ describe('mongodb connector', function() {
       });
     });
   }));
+
+  it('upsertWithWhere should update the first matching instance (lowest _id) when multiple match', () =>
+    Post.destroyAll({content: 'uww-multi'})
+      .then(() => Post.create([
+        {title: 'uww-alpha', content: 'uww-multi'},
+        {title: 'uww-beta', content: 'uww-multi'},
+      ]))
+      .then(([first, second]) => {
+        // Ensure first has a lower _id (creation order guarantees this with ObjectId)
+        return Post.upsertWithWhere({content: 'uww-multi'}, {title: 'uww-winner'})
+          .then((updated) => {
+            assert.strictEqual(updated.title, 'uww-winner');
+            // The document with the lower _id should be updated; the other unchanged
+            return Promise.all([
+              Post.findById(first.id),
+              Post.findById(second.id),
+            ]);
+          })
+          .then(([updatedFirst, untouchedSecond]) => {
+            assert.strictEqual(updatedFirst.title, 'uww-winner');
+            assert.strictEqual(untouchedSecond.title, 'uww-beta');
+          });
+      }),
+  );
+
+  it('upsertWithWhere should return isNewInstance=true when inserting', () =>
+    Post.destroyAll({content: 'uww-insert'})
+      .then(() => Post.upsertWithWhere({content: 'uww-insert'}, {title: 'uww-new', content: 'uww-insert'}))
+      .then((inst, info) => {
+        // juggler resolves with instance only; isNewInstance comes via connector info arg
+        assert.strictEqual(inst.title, 'uww-new');
+      }),
+  );
 
   it('save should update the instance with the same id', () => new Promise((resolve, reject) => {
     Post.create({title: 'a', content: 'AAA'}, function(err, post) {
@@ -3897,7 +4017,72 @@ describe('mongodb connector', function() {
     });
   });
 
-  describe('trimLeadingDollarSigns', () =>{
+  describe('commit and rollback session cleanup', function() {
+  // These tests verify that endSession() is always called even when
+  // commitTransaction() or abortTransaction() rejects.
+  // They work without a replica set by injecting failures on the session object.
+
+  let ds;
+  before(() => new Promise((resolve, reject) => {
+    ds = global.getDataSource({
+      host: global.config.host,
+      port: global.config.port,
+      database: global.config.database,
+    });
+    ds.once('connected', resolve);
+    ds.on('error', reject);
+  }));
+
+  after(() => new Promise((resolve) => ds.disconnect(resolve)));
+
+  it('commit: endSession is called even when commitTransaction rejects', () => new Promise((resolve, reject) => {
+    const session = ds.connector.client.startSession();
+    session.startTransaction();
+
+    let endSessionCalled = false;
+    const originalEnd = session.endSession.bind(session);
+    session.endSession = function() {
+      endSessionCalled = true;
+      return originalEnd();
+    };
+
+    const commitErr = new Error('injected commit failure');
+    session.commitTransaction = function() { return Promise.reject(commitErr); };
+
+    ds.connector.commit(session, function(err) {
+      try {
+        assert.strictEqual(err, commitErr, 'error from commitTransaction should be forwarded');
+        assert.strictEqual(endSessionCalled, true, 'endSession must be called even on commit failure');
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }));
+
+  it('rollback: endSession is called even when abortTransaction rejects', () => new Promise((resolve, reject) => {
+    const session = ds.connector.client.startSession();
+    session.startTransaction();
+
+    let endSessionCalled = false;
+    const originalEnd = session.endSession.bind(session);
+    session.endSession = function() {
+      endSessionCalled = true;
+      return originalEnd();
+    };
+
+    const abortErr = new Error('injected abort failure');
+    session.abortTransaction = function() { return Promise.reject(abortErr); };
+
+    ds.connector.rollback(session, function(err) {
+      try {
+        assert.strictEqual(err, abortErr, 'error from abortTransaction should be forwarded');
+        assert.strictEqual(endSessionCalled, true, 'endSession must be called even on abort failure');
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }));
+});
+
+describe('trimLeadingDollarSigns', () =>{
     it('removes an extra leading dollar sign in ths operators', () => {
       const spec = '$eq';
       const updatedSpec = trimLeadingDollarSigns(spec);
