@@ -1,18 +1,23 @@
 {
   "name": "loopback-connector-mongodb",
-  "version": "7.0.0-alpha.2",
+  "version": "6.5.0",
   "description": "The official MongoDB connector for the LoopBack framework.",
   "engines": {
-    "node": "18 || 20"
+    "node": ">=22"
   },
   "author": "IBM Corp.",
   "main": "index.js",
   "scripts": {
     "benchmarks": "make benchmarks",
     "leak-detection": "make leak-detection",
-    "test": "nyc --reporter=lcov mocha --exit --timeout=5000 test/*.test.js node_modules/juggler-v4/test.js",
+    "test": "yarn test:unit && yarn test:juggler",
+    "test:unit": "c8 node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/*.test.js",
+    "test:juggler": "mocha --exit --timeout=10000 node_modules/juggler-v4/test.js",
+    "coverage:text": "c8 report --reporter=text",
+    "coverage:lcov": "c8 report --reporter=lcov",
     "lint": "eslint .",
-    "posttest": "npm run lint"
+    "lint:fix": "eslint . --fix",
+    "posttest": "yarn lint"
   },
   "files": [
     "intl",
@@ -32,29 +37,30 @@
     "mongodb"
   ],
   "license": "MIT",
+  "resolutions": {
+    "minimatch": "^9.0.7",
+    "glob": "^10.5.0",
+    "eslint-plugin-mocha": "^11.3.0"
+  },
   "dependencies": {
-    "async": "^3.2.4",
-    "bson": "^1.1.6",
-    "debug": "^4.3.4",
-    "loopback-connector": "^5.0.1",
+    "debug": "^4.4.3",
+    "loopback-connector": "5.3.3",
     "mongodb": "^4.6.0",
-    "strong-globalize": "^6.0.5"
+    "strong-globalize": "^6.0.6"
   },
   "devDependencies": {
-    "@commitlint/config-conventional": "^17.1.0",
+    "@commitlint/config-conventional": "^21.0.1",
+    "@eslint/eslintrc": "^3.3.5",
     "benchmark": "^2.1.4",
-    "bluebird": "^3.7.2",
-    "commitlint": "^17.1.1",
-    "eslint": "^8.23.0",
-    "eslint-config-loopback": "^13.1.0",
-    "eslint-plugin-mocha": "^9.0.0",
+    "c8": "^11.0.0",
+    "commitlint": "^21.0.1",
+    "eslint": "^10.4.0",
+    "eslint-config-loopback": "^14.0.0",
+    "globals": "^17.6.0",
     "juggler-v4": "file:./deps/juggler-v4",
-    "loopback-datasource-juggler": "^4.27.1",
-    "mocha": "^9.2.2",
-    "nyc": "^15.1.0",
+    "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^5.2.11",
+    "mocha": "^11.7.6",
     "rc": "^1.2.8",
-    "semver": "^7.3.7",
-    "should": "^13.2.3",
-    "sinon": "^12.0.1"
+    "semver": "^7.8.1"
   }
 }
