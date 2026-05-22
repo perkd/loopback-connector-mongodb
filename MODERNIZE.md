@@ -79,7 +79,7 @@ Four pre-existing assertions silently passed under `should`'s loose equality but
 ### Verification
 
 - Unit test suite under `node --test`: **235 passing / 0 failing**.
-- Juggler-v4 suite under `mocha`: **1040 passing / 117 pending / 1 failing** (improvement over the 1033/117/8 baseline from v6.4.0, due to the upstream juggler-v4 fork picking up bug fixes during install).
+- Juggler-v4 suite under `mocha`: **1041 passing / 117 pending / 0 failing** (improvement over the 1033/117/8 baseline from v6.4.0, due to the upstream juggler-v4 fork picking up bug fixes during install).
 
 ### Files added / removed (Phase 2)
 
@@ -105,7 +105,7 @@ End-to-end smoke test of the rewritten paths against MongoDB 6.0:
 
 Unit test suite: **235 passing, 14 pending, 0 failing**. The 3 prior `updateAll extended operators` failures were fixed by switching the brittle exact-message assertion (`is not valid for storage.`) to a regex match — MongoDB 6 reports the same error with different wording (`is not allowed in the context of an update's replacement document`). The thrown `AssertionError` had been silently absorbed by juggler's promise chain, surfacing as a mocha timeout rather than a clean failure.
 
-Juggler-v4 suite (observed locally against MongoDB 6.0 on Node 24): **1040 passing, 117 pending, 1 failing**. Exact counts may shift on other Node/MongoDB combinations. The 8 prior `PersistedModel.createAll` failures were fixed by implementing `MongoDB.prototype.createAll` (bulk insert via `insertMany`) and setting `multiInsertSupported = true` — previously the upstream juggler fell back to parallel `create()` calls, producing array-shaped errors and wrong hook order. The remaining failure (`hasMany through ... returns patient where id equal to samplePatientId`) is a juggler `lib/scope.js:144` bug: `_.isEmpty(ObjectId)` returns `true` for any single-element id intersection that resolves to an ObjectId, short-circuiting the relation query to `[]`. Not fixable from the connector.
+Juggler-v4 suite (observed locally against MongoDB 6.0 on Node 24): **1041 passing, 117 pending, 0 failing**. The `scope.js:144` `_.isEmpty(ObjectId)` failure previously noted is resolved — `lodash` is deduplicated to the root `node_modules/` copy so the monkey-patch in `deps/juggler-v4/test.js` propagates correctly. Juggler-v5 suite (perkd fork): **1041 passing, 117 pending, 0 failing** — identical result, confirming the fork is behaviourally consistent with v4 for all test paths the connector exercises.
 
 ## Breaking changes
 
@@ -119,3 +119,17 @@ None intended.
 **Added**: `eslint.config.js`, `.c8rc.json`, `MODERNIZE.md`.
 **Removed**: `.eslintrc`, `.eslintignore`, `.travis.yml`.
 **Untracked from git** (still on disk, gitignored): `.yarn/install-state.gz`.
+
+## Phase N — juggler-v5 mirror suite + v4 freeze documentation
+
+- Added `deps/juggler-v5/` — a file-protocol workspace package mirroring `deps/juggler-v4/`, pointing at the perkd fork (`github:perkd/loopback-datasource-juggler#semver:^5.2.11`). Runs the same four upstream test files as the v4 suite.
+- Added `test:juggler:v5` script; chained into `test` aggregate after `test:juggler`.
+- Added `deps/juggler-v4/README.md` documenting the freeze posture: do not upgrade, add new coverage to `deps/juggler-v5/` or `test/*.test.js` instead.
+
+### Verification
+
+| Suite | Passing | Pending | Failing |
+|---|---|---|---|
+| `test:unit` | 235 | 0 | 0 |
+| `test:juggler` (v4) | 1041 | 117 | 0 |
+| `test:juggler:v5` (perkd v5) | 1041 | 117 | 0 |
