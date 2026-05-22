@@ -2,3 +2,12 @@ node_modules
 coverage
 .idea
 .nyc_output/
+
+# Yarn Berry (4.x) — never commit cache or install-state
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

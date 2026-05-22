@@ -1,0 +1,14 @@
+{
+  "reporter": ["text", "html", "lcov", "json"],
+  "reports-dir": "coverage",
+  "include": ["lib/**/*.js", "index.js"],
+  "exclude": ["test/**", "coverage/**", "node_modules/**", "benchmarks/**", "leak-detection/**", "deps/**"],
+  "check-coverage": false,
+  "lines": 50,
+  "functions": 50,
+  "branches": 40,
+  "statements": 50,
+  "per-file": false,
+  "clean": true,
+  "all": true
+}
