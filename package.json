@@ -1,6 +1,6 @@
 {
   "name": "loopback-connector-mongodb",
-  "version": "6.5.0",
+  "version": "6.5.1",
   "description": "The official MongoDB connector for the LoopBack framework.",
   "engines": {
     "node": ">=22"
@@ -10,9 +10,11 @@
   "scripts": {
     "benchmarks": "make benchmarks",
     "leak-detection": "make leak-detection",
-    "test": "yarn test:unit && yarn test:juggler",
+    "test": "yarn test:unit && yarn test:juggler && yarn test:juggler:v5",
     "test:unit": "c8 node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/*.test.js",
+    "test:transactions": "TEST_TRANSACTIONS=1 node --test --test-force-exit --test-reporter=spec --test-timeout=10000 test/transaction.test.js",
     "test:juggler": "mocha --exit --timeout=10000 node_modules/juggler-v4/test.js",
+    "test:juggler:v5": "mocha --exit --timeout=10000 node_modules/juggler-v5/test.js",
     "coverage:text": "c8 report --reporter=text",
     "coverage:lcov": "c8 report --reporter=lcov",
     "lint": "eslint .",
@@ -58,6 +60,7 @@
     "eslint-config-loopback": "^14.0.0",
     "globals": "^17.6.0",
     "juggler-v4": "file:./deps/juggler-v4",
+    "juggler-v5": "file:./deps/juggler-v5",
     "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^5.2.11",
     "mocha": "^11.7.6",
     "rc": "^1.2.8",

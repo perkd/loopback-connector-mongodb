@@ -20,11 +20,11 @@ If you create a MongoDB data source using the data source generator as described
 
 This module adopts the [Module Long Term Support (LTS)](http://github.com/CloudNativeJS/ModuleLTS) policy, with the following End Of Life (EOL) dates:
 
-| Version    | Status               | Published | EOL                  | LoopBack | Juggler  |
-| ---------- | -------------------- | --------- | -------------------- | ---------|----------|
-| 6.x        | Current              | Mar 2021  | Apr 2025 _(minimum)_ | 4        | 4.x      |
-| 5.x        | Active LTS           | Jun 2019  | Apr 2023             | 3, 4     | 3.x, 4.x |
-| 4.x        | Maintenance LTS      | Nov 2018  | Apr 2021             | 3, 4     | 3.x, 4.x |
+| Version    | Status               | Published | EOL                  | LoopBack | Juggler      |
+| ---------- | -------------------- | --------- | -------------------- | ---------|--------------|
+| 6.x        | Current              | Mar 2021  | TBD                  | 4        | 4.x, 5.x     |
+| 5.x        | End of Life          | Jun 2019  | Apr 2023             | 3, 4     | 3.x, 4.x     |
+| 4.x        | End of Life          | Nov 2018  | Apr 2021             | 3, 4     | 3.x, 4.x     |
 
 ## Creating a MongoDB data source
 
@@ -347,18 +347,18 @@ npm test
 
 ### Leak detection
 
-Tests run for 100 iterations by default, but can be increased by setting the
-env var `ITERATIONS`.
+Uses a built-in heap-growth detector (`leak-detection/heap-leak.js`) — no
+native modules to install. Requires MongoDB running on `localhost:27017`.
 
-```
-make leak-detection # run 100 iterations (default)
+Tests run for 100 iterations by default. Increase via `ITERATIONS` for
+higher confidence (recommended ≥500 before a driver upgrade).
+
+```bash
+make leak-detection          # 100 iterations (default)
+ITERATIONS=500 make leak-detection  # higher confidence run
 ```
 
-or
-
-```
-ITERATIONS=1000 make leak-detection # run 1000 iterations
-```
+The `--expose-gc` flag is passed automatically by the Makefile.
 
 ## Running benchmarks
 

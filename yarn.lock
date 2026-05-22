@@ -2893,11 +2893,21 @@ __metadata:
 
 "juggler-v4@file:./deps/juggler-v4::locator=loopback-connector-mongodb%40workspace%3A.":
   version: 4.0.0
-  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=54ebba&locator=loopback-connector-mongodb%40workspace%3A."
+  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=cde869&locator=loopback-connector-mongodb%40workspace%3A."
   dependencies:
     loopback-datasource-juggler: "npm:4.x"
     should: "npm:^13.2.3"
-  checksum: 10c0/05242f32f437b33d5c3ebd2e884d978281db8561251befb42e3cf0c2828de5e0679e7e3f222fb226f6ff608b77cf8085a78f705573fc6d92ace48b093887e521
+  checksum: 10c0/38eda630e7600154df67a71afaee21aab2c3ef8025fed7e127b8248cec7d4b4ac817cec10a99edc3615176059ce8676e1b3eb4ba4525bcea65180056088219ee
+  languageName: node
+  linkType: hard
+
+"juggler-v5@file:./deps/juggler-v5::locator=loopback-connector-mongodb%40workspace%3A.":
+  version: 5.0.0
+  resolution: "juggler-v5@file:./deps/juggler-v5#./deps/juggler-v5::hash=5bbbc7&locator=loopback-connector-mongodb%40workspace%3A."
+  dependencies:
+    loopback-datasource-juggler: "github:perkd/loopback-datasource-juggler#semver:^5.2.11"
+    should: "npm:^13.2.3"
+  checksum: 10c0/da4d535402ec9e711d57023e51f549a0152124440cfc5fbd859d5ec69ae0d44e9d8e98a4a3d4730606f1b6b4c4c73938762359065d6790bb741901a34d3db2d7
   languageName: node
   linkType: hard
 
@@ -2976,6 +2986,7 @@ __metadata:
     eslint-config-loopback: "npm:^14.0.0"
     globals: "npm:^17.6.0"
     juggler-v4: "file:./deps/juggler-v4"
+    juggler-v5: "file:./deps/juggler-v5"
     loopback-connector: "npm:5.3.3"
     loopback-datasource-juggler: "github:perkd/loopback-datasource-juggler#semver:^5.2.11"
     mocha: "npm:^11.7.6"
