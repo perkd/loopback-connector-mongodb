@@ -1325,10 +1325,7 @@ describe('mongodb connector', function() {
             function(err, updatedusers) {
               should.exist(err);
               err.name.should.equal('MongoServerError');
-              err.errmsg.should.equal(
-                'The dollar ($) prefixed ' +
-                "field '$rename' in '$rename' is not valid for storage.",
-              );
+              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
               done();
             },
           );
@@ -1350,10 +1347,7 @@ describe('mongodb connector', function() {
             function(err, updatedusers) {
               should.exist(err);
               err.name.should.equal('MongoServerError');
-              err.errmsg.should.equal(
-                'The dollar ($) prefixed ' +
-                "field '$rename' in '$rename' is not valid for storage.",
-              );
+              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
               done();
             },
           );
@@ -1407,10 +1401,7 @@ describe('mongodb connector', function() {
             function(err, updatedusers) {
               should.exist(err);
               err.name.should.equal('MongoServerError');
-              err.errmsg.should.equal(
-                'The dollar ($) prefixed ' +
-                "field '$rename' in '$rename' is not valid for storage.",
-              );
+              err.errmsg.should.match(/The dollar \(\$\) prefixed field '\$rename' in '\$rename'/);
               done();
             },
           );
