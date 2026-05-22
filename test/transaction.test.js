@@ -11,12 +11,20 @@ const Transaction = require('loopback-connector/lib/transaction');
 require('./init.js');
 
 const juggler = require('loopback-datasource-juggler');
+
+// Transactions require a MongoDB replica set on localhost:27000-27002.
+// Start one with:  run-rs -v 4.2.0 --host localhost --portStart 27000
+// Then opt in:     TEST_TRANSACTIONS=1 yarn test:unit
+const ENABLED = process.env.TEST_TRANSACTIONS === '1';
+const RS_URL = 'mongodb://localhost:27000,localhost:27001,localhost:27002/testdb?replicaSet=rs';
+
+const suite = ENABLED ? describe : describe.skip;
+
 let db, Post, Review;
-describe.skip('transactions', function() {
+suite('transactions', function() {
   before(() => new Promise((resolve, reject) => {
-    // use run-rs -v 4.2.0 --host localhost --portStart 27000 to start replicaset for transaction testing
     db = global.getDataSource({
-      url: 'mongodb://localhost:27000,localhost:27001,localhost:27002/testdb?replicaSet=rs',
+      url: RS_URL,
       retryWrites: false,
     });
     db.once('connected', function() {

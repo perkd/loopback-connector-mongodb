@@ -1,17 +1,20 @@
-// Copyright IBM Corp. 2015,2019. All Rights Reserved.
+// Copyright IBM Corp. 2015,2025. All Rights Reserved.
 // Node module: loopback-connector-mongodb
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
 'use strict';
 
-const memwatch = require('memwatch-next');
+const assert = require('node:assert/strict');
+const {createDetector} = require('./heap-leak');
 const Todo = require('./fixtures/todo');
+const DataSource = require('loopback-datasource-juggler').DataSource;
+const connector = require('..');
 
 describe('mongodb', function() {
-  let leakCount = 0;
+  let detector;
   before(function() {
-    memwatch.on('leak', () => { leakCount++; });
+    detector = createDetector();
   });
 
   after(function(done) {
@@ -19,7 +22,7 @@ describe('mongodb', function() {
   });
 
   function resetTestState(ctx, cb) {
-    leakCount = 0;
+    detector.start();
     ctx.iterations = 0;
     Todo.destroyAll(cb);
   }
@@ -31,14 +34,15 @@ describe('mongodb', function() {
       hasOptions = false;
     }
     const interval = setInterval(function() {
-      if (ctx.iterations >= global.ITERATIONS || leakCount > 0) {
-        (leakCount === 0).should.be.True();
+      if (ctx.iterations >= global.ITERATIONS || detector.leaked()) {
         clearInterval(interval);
+        assert.ok(!detector.leaked(), 'sustained heap growth detected');
         return done();
       }
       ctx.iterations++;
       // eslint-disable-next-line
       hasOptions ? Todo[func](options) : Todo[func];
+      detector.sample();
     }, 0);
   }
 
@@ -87,6 +91,40 @@ describe('mongodb', function() {
         ],
         done,
       );
+    });
+  });
+
+  context('multi-tenant DataSource churn', function() {
+    beforeEach(function(done) {
+      detector.start();
+      this.iterations = 0;
+      done();
+    });
+
+    it('should not leak when DataSources are created and disconnected in a loop', function(done) {
+      const self = this;
+      const baseDb = process.env.LB_DB || 'strongloop';
+      (function next() {
+        if (self.iterations >= global.ITERATIONS || detector.leaked()) {
+          assert.ok(!detector.leaked(), 'sustained heap growth across DataSource churn');
+          return done();
+        }
+        self.iterations++;
+        const ds = new DataSource(connector, {
+          host: process.env.LB_HOST || '127.0.0.1',
+          port: process.env.LB_PORT || 27017,
+          database: `${baseDb}-mt-${self.iterations}`,
+        });
+        const Note = ds.define('LeakNote', {content: {type: String}});
+        Note.create({content: 'churn'}, function(err) {
+          if (err) return done(err);
+          ds.disconnect(function(err) {
+            if (err) return done(err);
+            detector.sample();
+            setImmediate(next);
+          });
+        });
+      })();
     });
   });
 });

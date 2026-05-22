@@ -1,40 +1,30 @@
-// Copyright IBM Corp. 2015,2019. All Rights Reserved.
+// Copyright IBM Corp. 2015,2025. All Rights Reserved.
 // Node module: loopback-connector-mongodb
 // This file is licensed under the MIT License.
 // License text available at https://opensource.org/licenses/MIT
 
 'use strict';
 
-const assert = require('assert');
+const assert = require('node:assert/strict');
+const {createDetector} = require('./heap-leak');
 
-let memwatch;
-
-try {
-  memwatch = require('@airbnb/node-memwatch');
-} catch (e) {
-  memwatch = require('memwatch-next');
-}
 describe('leak detector', function() {
-  let leakCount = 0;
-  before(function() {
-    memwatch.on('leak', () => { leakCount++; });
-  });
-
   it('should detect a basic leak', function(done) {
     const test = this;
-    const iterations = 0;
+    const detector = createDetector();
     const leaks = [];
+    detector.start();
     const interval = setInterval(function() {
-      if (test.iterations >= global.ITERATIONS || leakCount > 0) {
-        assert.ok(leakCount > 0);
+      if (test.iterations >= global.ITERATIONS || detector.leaked()) {
         clearInterval(interval);
+        assert.ok(detector.leaked(), 'detector should report a leak on sustained heap growth');
         return done();
       }
-      test.iterations++;
-      for (let i = 0; i < 1000000; i++) {
-        const str = 'leaky string';
-        leaks.push(str);
+      test.iterations = (test.iterations || 0) + 1;
+      for (let i = 0; i < 100000; i++) {
+        leaks.push('leaky string ' + i);
       }
+      detector.sample();
     }, 0);
   });
 });

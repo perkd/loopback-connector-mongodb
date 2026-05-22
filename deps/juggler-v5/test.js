@@ -34,6 +34,8 @@ describe(name, function() {
   require('loopback-datasource-juggler/test/common.batch.js');
   require('loopback-datasource-juggler/test/default-scope.test.js');
   require('loopback-datasource-juggler/test/include.test.js');
+  require('loopback-datasource-juggler/test/tenant-aware-model-registry.test.js');
+  require('loopback-datasource-juggler/test/multitenant-datasource-accessor.test.js');
 
   // === Operation hooks ==== //
 
