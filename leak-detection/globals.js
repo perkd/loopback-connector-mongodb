@@ -6,4 +6,3 @@
 'use strict';
 
 global.ITERATIONS = process.env.ITERATIONS || 100;
-require('should');

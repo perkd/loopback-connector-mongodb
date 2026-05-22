@@ -5,6 +5,8 @@
 
 'use strict';
 
+const assert = require('assert');
+
 let memwatch;
 
 try {
@@ -24,7 +26,7 @@ describe('leak detector', function() {
     const leaks = [];
     const interval = setInterval(function() {
       if (test.iterations >= global.ITERATIONS || leakCount > 0) {
-        (leakCount > 0).should.be.True();
+        assert.ok(leakCount > 0);
         clearInterval(interval);
         return done();
       }
