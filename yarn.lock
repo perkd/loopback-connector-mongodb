@@ -442,12 +442,12 @@ __metadata:
   linkType: hard
 
 "@perkd/errors@github:perkd/errors#semver:^0.6.0":
-  version: 0.6.3
-  resolution: "@perkd/errors@https://github.com/perkd/errors.git#commit=94779209019d0ecaa77a8532e3168e144fc4b6f0"
+  version: 0.6.4
+  resolution: "@perkd/errors@https://github.com/perkd/errors.git#commit=3d96abc0c8021165a30dd40e00b1171e04c03388"
   dependencies:
     http-errors: "npm:^2.0.1"
     tslib: "npm:^2.8.1"
-  checksum: 10c0/970d3d546b0d6a021079d4feab00ae7a332ef8d6a375c7b50c0b696485044fc394ff7bc74e4521623ffdbe29378d7826eb6890411b656f500a675c001dc00434
+  checksum: 10c0/ddc9b979d3ff053d1e8fabd95cf4a1e5d619f11c03a697c8a7c4a915ad23e69f2f6aed21026dcb7b3b402d0e15d25dc6bc87f735b6f28fa941f4198c6b96b182
   languageName: node
   linkType: hard
 

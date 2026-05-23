@@ -1,6 +1,6 @@
 {
   "name": "loopback-connector-mongodb",
-  "version": "7.0.1",
+  "version": "7.0.2",
   "description": "The official MongoDB connector for the LoopBack framework.",
   "engines": {
     "node": ">=22"
@@ -11,7 +11,7 @@
     "benchmarks": "make benchmarks",
     "leak-detection": "make leak-detection",
     "test": "yarn test:unit && yarn test:juggler && yarn test:juggler:v5",
-    "test:unit": "c8 node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/*.test.js",
+    "test:unit": "c8 node --test --test-force-exit --test-concurrency=2 --test-reporter=spec --test-timeout=5000 test/connector-functions.test.js test/decimal.test.js test/id.test.js test/method-options.test.js test/mongodb.test.js test/multitenant.test.js test/objectid.test.js",
     "test:multitenant": "node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/multitenant-dispatch.test.js",
     "test:transactions": "TEST_TRANSACTIONS=1 node --test --test-force-exit --test-reporter=spec --test-timeout=10000 test/transaction.test.js",
     "test:juggler": "mocha --exit --timeout=10000 node_modules/juggler-v4/test.js",
