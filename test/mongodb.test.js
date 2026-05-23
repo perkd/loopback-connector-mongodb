@@ -11,6 +11,7 @@ require('./init.js');
 
 const {describe, it, before, beforeEach, after, afterEach} = require('node:test');
 const assert = require('node:assert/strict');
+const mongodb = require('mongodb');
 const testUtils = require('../lib/test-utils');
 
 function __CONTAIN_FN__(actual, expected) {
@@ -183,6 +184,81 @@ describe('connect', function() {
       },
     );
   }));
+
+  it('should reconnect on execute without datasource reference', async function() {
+    const originalConnect = mongodb.MongoClient.prototype.connect;
+    let ds;
+    let connectCalls = 0;
+
+    const fakeDb = {
+      collection: function() {
+        return {
+          findOne: function() {
+            return Promise.resolve({value: 'test value'});
+          },
+        };
+      },
+    };
+    const fakeClient = {
+      db: function() {
+        return fakeDb;
+      },
+      close: function() {
+        return Promise.resolve();
+      },
+    };
+
+    mongodb.MongoClient.prototype.connect = function() {
+      connectCalls++;
+      return Promise.resolve(fakeClient);
+    };
+
+    try {
+      ds = global.getDataSource({
+        url: 'mongodb://127.0.0.1:27017/test-detached-datasource',
+        lazyConnect: true,
+      });
+      ds.define('TestDetached', {
+        value: {type: String},
+      });
+
+      const firstResult = await new Promise((resolve, reject) => {
+        ds.connector.execute('TestDetached', 'findOne', {}, function(err, data) {
+          if (err) return reject(err);
+          resolve(data);
+        });
+      });
+      assert.deepStrictEqual(firstResult, {value: 'test value'});
+      assert.strictEqual(connectCalls, 1);
+
+      await new Promise((resolve, reject) => {
+        ds.connector.disconnect(function(err) {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+
+      ds.connector.dataSource = null;
+
+      const secondResult = await new Promise((resolve, reject) => {
+        ds.connector.execute('TestDetached', 'findOne', {}, function(err, data) {
+          if (err) return reject(err);
+          resolve(data);
+        });
+      });
+      assert.deepStrictEqual(secondResult, {value: 'test value'});
+      assert.strictEqual(connectCalls, 2);
+    } finally {
+      mongodb.MongoClient.prototype.connect = originalConnect;
+      if (ds && ds.connector && ds.connector.client) {
+        await new Promise((resolve) => {
+          ds.connector.disconnect(function() {
+            resolve();
+          });
+        });
+      }
+    }
+  });
 });
 
 describe('mongodb connector', function() {
