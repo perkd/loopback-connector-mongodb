@@ -12,6 +12,7 @@
     "leak-detection": "make leak-detection",
     "test": "yarn test:unit && yarn test:juggler && yarn test:juggler:v5",
     "test:unit": "c8 node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/*.test.js",
+    "test:multitenant": "node --test --test-force-exit --test-reporter=spec --test-timeout=5000 test/multitenant-dispatch.test.js",
     "test:transactions": "TEST_TRANSACTIONS=1 node --test --test-force-exit --test-reporter=spec --test-timeout=10000 test/transaction.test.js",
     "test:juggler": "mocha --exit --timeout=10000 node_modules/juggler-v4/test.js",
     "test:juggler:v5": "mocha --exit --timeout=10000 node_modules/juggler-v5/test.js",
@@ -54,6 +55,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^21.0.1",
     "@eslint/eslintrc": "^3.3.5",
+    "@perkd/multitenant-context": "github:perkd/multitenant-context#semver:^0.8.1",
     "benchmark": "^2.1.4",
     "c8": "^11.0.0",
     "commitlint": "^21.0.1",
