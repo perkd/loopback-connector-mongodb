@@ -135,6 +135,32 @@ describe('ObjectID', function() {
       assert.ok(found.xid instanceof ds.ObjectID);
     });
 
+    it('should store ObjectID fields via findOrCreate $setOnInsert', async function() {
+      const Member = ds.createModel(
+        'MemberFOC',
+        {
+          personId: {type: String, mongodb: {dataType: 'objectid'}},
+          title: String,
+        },
+        {strictObjectIDCoercion: true},
+      );
+
+      await Member.deleteAll();
+
+      const filter = {where: {personId: objectIDLikeString}};
+      const data = {personId: objectIDLikeString, title: 'member-foc'};
+      const [createdInst, created] = await Member.findOrCreate(filter, data);
+
+      assert.strictEqual(created, true);
+      const raw = await findRawModelDataAsync('MemberFOC', createdInst.id);
+      assert.ok(raw.personId instanceof ds.ObjectID);
+
+      const [foundInst, createdAgain] = await Member.findOrCreate(filter, data);
+      assert.strictEqual(createdAgain, false);
+      assert.strictEqual(String(foundInst.id), String(createdInst.id));
+      assert.strictEqual(await Member.count({personId: objectIDLikeString}), 1);
+    });
+
     it('should properly save an array of ObjectIDs', async () => {
       await Article.create({
         xid: objectIDLikeString,

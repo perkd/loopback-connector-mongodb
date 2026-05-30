@@ -1,3 +1,13 @@
+# 2026-05-30, Version 7.0.3
+
+- fix: `findOrCreate` now calls `toDatabase()` before `$setOnInsert`, so fields
+  with `mongodb.dataType: ObjectID` are stored as BSON ObjectId (same as
+  `create()`). Previously the find query coerced ObjectIds but inserts did not,
+  which could store string foreign keys and fail to match on subsequent calls.
+
+- test: add unit and integration coverage for ObjectID coercion in
+  `findOrCreate`.
+
 # 2026-05-22, Version 7.0.0
 
 - feat: upgrade MongoDB Node.js driver from `^4.6.0` to `^7.2.0` (breaking
