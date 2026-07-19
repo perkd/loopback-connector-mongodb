@@ -1,3 +1,13 @@
+# @perkd/loopback-connector-mongodb
+
+Formerly published as `loopback-connector-mongodb`.
+
+Published to GitHub Packages. Consumers typically alias:
+
+```bash
+yarn add loopback-connector-mongodb@npm:@perkd/loopback-connector-mongodb@^8.0.0
+```
+
 # loopback-connector-mongodb
 
 The official MongoDB connector for the LoopBack framework.

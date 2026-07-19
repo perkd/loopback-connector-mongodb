@@ -1,6 +1,6 @@
 {
-  "name": "loopback-connector-mongodb",
-  "version": "7.0.3",
+  "name": "@perkd/loopback-connector-mongodb",
+  "version": "8.0.0",
   "description": "The official MongoDB connector for the LoopBack framework.",
   "engines": {
     "node": ">=22"
@@ -32,7 +32,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git://github.com/loopbackio/loopback-connector-mongodb.git"
+    "url": "git+ssh://git@github.com/perkd/loopback-connector-mongodb.git"
   },
   "keywords": [
     "connector",
@@ -55,7 +55,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^21.0.1",
     "@eslint/eslintrc": "^3.3.5",
-    "@perkd/multitenant-context": "github:perkd/multitenant-context#semver:^0.8.1",
+    "@perkd/multitenant-context": "^0.8.2",
     "benchmark": "^2.1.4",
     "c8": "^11.0.0",
     "commitlint": "^21.0.1",
@@ -64,9 +64,18 @@
     "globals": "^17.6.0",
     "juggler-v4": "file:./deps/juggler-v4",
     "juggler-v5": "file:./deps/juggler-v5",
-    "loopback-datasource-juggler": "github:perkd/loopback-datasource-juggler#semver:^6.0.0",
+    "loopback-datasource-juggler": "npm:@perkd/loopback-datasource-juggler@^7.0.0",
     "mocha": "^11.7.6",
     "rc": "^1.2.8",
     "semver": "^7.8.1"
+  },
+  "packageManager": "yarn@4.17.0",
+  "bugs": {
+    "url": "https://github.com/perkd/loopback-connector-mongodb/issues"
+  },
+  "homepage": "https://github.com/perkd/loopback-connector-mongodb#readme",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "restricted"
   }
 }

@@ -1,0 +1,46 @@
+name: Publish Package
+on:
+  push:
+    tags:
+      - '[0-9]*'
+permissions:
+  contents: write
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GH_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://npm.pkg.github.com
+          scope: '@perkd'
+      - name: Configure git auth for private git-semver deps
+        run: git config --global url."https://x-access-token:${GITHUB_PAT}@github.com/".insteadOf "https://github.com/"
+      - name: Install dependencies
+        run: corepack enable && yarn install --immutable
+      - name: Build
+        run: echo "no build step"
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@perkd/loopback-connector-mongodb@${VERSION}" --registry=https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "Version ${VERSION} already published — skipping npm publish"
+          else
+            npm publish --access restricted
+          fi
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists — skipping"
+          else
+            gh release create "$TAG" --generate-notes
+          fi
