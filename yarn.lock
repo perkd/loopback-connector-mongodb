@@ -485,7 +485,7 @@ __metadata:
     juggler-v4: "file:./deps/juggler-v4"
     juggler-v5: "file:./deps/juggler-v5"
     loopback-connector: "npm:5.3.3"
-    loopback-datasource-juggler: "npm:@perkd/loopback-datasource-juggler@^7.0.0"
+    loopback-datasource-juggler: "npm:@perkd/loopback-datasource-juggler@^6.1.0"
     mocha: "npm:^11.7.6"
     mongodb: "npm:^7.2.0"
     rc: "npm:^1.2.8"
@@ -2970,9 +2970,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loopback-datasource-juggler@npm:@perkd/loopback-datasource-juggler@^7.0.0":
-  version: 7.0.0
-  resolution: "@perkd/loopback-datasource-juggler@npm:7.0.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Floopback-datasource-juggler%2F7.0.0%2Fc15e4bda3ab54a06f9f279d358bdcb510d705912"
+"loopback-datasource-juggler@npm:@perkd/loopback-datasource-juggler@^6.1.0":
+  version: 6.1.0
+  resolution: "@perkd/loopback-datasource-juggler@npm:6.1.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Floopback-datasource-juggler%2F6.1.0%2Fd3b5a2bf0b752f30a2452fdc638793dfb8f139e7"
   dependencies:
     async: "npm:^3.2.6"
     change-case: "npm:5.4.4"
@@ -2986,7 +2986,7 @@ __metadata:
     qs: "npm:^6.15.3"
     strong-globalize: "npm:^6.0.6"
     uuid: "npm:11.1.0"
-  checksum: 10c0/3b1f4d5b988897ba36be2bf62fc360e88100b46903e06d07c8e28b3493066e7a70792bcc810f1ad4a6ff7e304c9d6ffca6d330546296ce6205c33acd5442944e
+  checksum: 10c0/28390885041e585a347fd1c6b12d62afbb7bd17cbd9be9e76875362b54f3d4b7f21c9169e2419df3fd5592946cf669553e340f8700bb035cbc39a97ebc0bdb0a
   languageName: node
   linkType: hard
 
