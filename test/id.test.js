@@ -440,11 +440,15 @@ describe('strictObjectIDCoercion', function() {
     });
 
     it('should throw if id is not a ObjectID-like string', async function() {
-      try {
-        await User.create({id: 'abc', name: 'John'});
-      } catch (e) {
-        assert.match(String(e.message), /not an ObjectID string/);
-      }
+      await assert.rejects(
+        User.create({id: 'abc', name: 'John'}),
+        // Rejected either by juggler's ObjectId validation or, if that is
+        // bypassed, by the connector's own coercion check.
+        (e) => {
+          assert.match(String(e.message), /not an ObjectID string|is not a valid ObjectId/);
+          return true;
+        },
+      );
     });
 
     it('should find model with ObjectID id', async function() {

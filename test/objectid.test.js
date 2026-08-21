@@ -122,11 +122,15 @@ describe('ObjectID', function() {
     }));
 
     it('should throw if value is not an ObjectID-like string', async function() {
-      try {
-        await Article.create({xid: '', title: 'abc'});
-      } catch (e) {
-        assert.match(String(e.message), /not an ObjectID string/);
-      }
+      await assert.rejects(
+        Article.create({xid: '', title: 'abc'}),
+        // Rejected either by juggler's ObjectId validation or, if that is
+        // bypassed, by the connector's own coercion check.
+        (e) => {
+          assert.match(String(e.message), /not an ObjectID string|is not a valid ObjectId/);
+          return true;
+        },
+      );
     });
 
     it('should save as ObjectID regardless of strictObjectIDCoercion: true', async function() {
