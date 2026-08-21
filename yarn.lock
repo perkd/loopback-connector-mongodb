@@ -465,6 +465,7 @@ __metadata:
     "@commitlint/config-conventional": "npm:^21.2.2"
     "@eslint/eslintrc": "npm:^3.3.6"
     "@perkd/multitenant-context": "npm:^0.8.4"
+    "@perkd/release": "npm:0.1.6"
     benchmark: "npm:^2.1.4"
     c8: "npm:^12.0.0"
     commitlint: "npm:^21.2.2"
@@ -494,6 +495,15 @@ __metadata:
     "@perkd/wallet": "npm:^0.5.4"
     tslib: "npm:^2.8.1"
   checksum: 10c0/c625aaf02946529863c7095327f1da067d93458493ce9348d766c6bc92b3134f3a9c4879f19f0662b7bea3b806a67641f507653b573afd15dc132d57560e0c5d
+  languageName: node
+  linkType: hard
+
+"@perkd/release@npm:0.1.6":
+  version: 0.1.6
+  resolution: "@perkd/release@npm:0.1.6::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Frelease%2F0.1.6%2Ffd5d21e53886beb83ff0971d2156f04f67468e9d"
+  bin:
+    perkd-release: ./bin/perkd-release.mjs
+  checksum: 10c0/1b8127d824056848cf9fca4114653d1866abcfd97d385d4f09052e5d562de7426a51858e8e0189eeef5c2d60adc2616c4155c12299fa1e4ec0bcfd7aaca0ce70
   languageName: node
   linkType: hard
 

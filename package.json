@@ -21,7 +21,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "posttest": "yarn lint",
-    "reinstall": "(rm -rf node_modules/ || true) && (rm yarn.lock || true) && yarn install"
+    "reinstall": "(rm -rf node_modules/ || true) && (rm yarn.lock || true) && yarn install",
+    "release": "perkd-release release",
+    "release:publish": "perkd-release publish"
   },
   "files": [
     "intl",
@@ -59,6 +61,7 @@
     "@commitlint/config-conventional": "^21.2.2",
     "@eslint/eslintrc": "^3.3.6",
     "@perkd/multitenant-context": "^0.8.4",
+    "@perkd/release": "0.1.6",
     "benchmark": "^2.1.4",
     "c8": "^12.0.0",
     "commitlint": "^21.2.2",
