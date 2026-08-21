@@ -2,6 +2,7 @@ node_modules
 coverage
 .idea
 .nyc_output/
+.DS_Store
 
 # Yarn Berry (4.x) — never commit cache or install-state
 .yarn/*
