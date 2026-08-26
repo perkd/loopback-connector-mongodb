@@ -439,12 +439,12 @@ __metadata:
   linkType: hard
 
 "@perkd/errors@npm:^0.6.5":
-  version: 0.6.8
-  resolution: "@perkd/errors@npm:0.6.8::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Ferrors%2F0.6.8%2Fe0ba4e83554894805e44926457dfe7cda2484525"
+  version: 0.6.9
+  resolution: "@perkd/errors@npm:0.6.9::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Ferrors%2F0.6.9%2Fb17c86c0525f0b27f11a05a611f3493c1ea403fc"
   dependencies:
     http-errors: "npm:^2.0.1"
     tslib: "npm:^2.8.1"
-  checksum: 10c0/c8019d30d6fa63319eae6545b4ae6a615aa0d9ed68e5542cda1582f061721ebc6597fd465e96ff991ae5c54cd8b92c90feb81f210bf44fdd3e834ab8d9e5ecee
+  checksum: 10c0/03f5dc081d046893724ce9fcb9c29c0e11cad99cc3148d6c24d97a3e366857e94e2eef553b3492174bce415c7c08b73720716600067b7123ebf013333e92e9b7
   languageName: node
   linkType: hard
 
@@ -465,12 +465,12 @@ __metadata:
     "@commitlint/config-conventional": "npm:^21.2.2"
     "@eslint/eslintrc": "npm:^3.3.6"
     "@perkd/multitenant-context": "npm:^0.8.4"
-    "@perkd/release": "npm:0.1.6"
+    "@perkd/release": "npm:0.1.8"
     benchmark: "npm:^2.1.4"
     c8: "npm:^12.0.0"
     commitlint: "npm:^21.2.2"
     debug: "npm:^4.4.3"
-    eslint: "npm:^10.8.1"
+    eslint: "npm:^10.9.1"
     eslint-config-loopback: "npm:^14.0.0"
     globals: "npm:^17.11.0"
     juggler-v4: "file:./deps/juggler-v4"
@@ -478,7 +478,7 @@ __metadata:
     loopback-connector: "npm:5.3.3"
     loopback-datasource-juggler: "npm:@perkd/loopback-datasource-juggler@^6.1.1"
     mocha: "npm:^11.8.0"
-    mongodb: "npm:^7.5.0"
+    mongodb: "npm:^7.6.0"
     rc: "npm:^1.2.8"
     semver: "npm:^7.8.5"
     strong-globalize: "npm:^6.0.6"
@@ -498,12 +498,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@perkd/release@npm:0.1.6":
-  version: 0.1.6
-  resolution: "@perkd/release@npm:0.1.6::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Frelease%2F0.1.6%2Ffd5d21e53886beb83ff0971d2156f04f67468e9d"
+"@perkd/release@npm:0.1.8":
+  version: 0.1.8
+  resolution: "@perkd/release@npm:0.1.8::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Frelease%2F0.1.8%2Ff43f2393e25c8cb17099677d04b073d36ac07b32"
   bin:
     perkd-release: ./bin/perkd-release.mjs
-  checksum: 10c0/1b8127d824056848cf9fca4114653d1866abcfd97d385d4f09052e5d562de7426a51858e8e0189eeef5c2d60adc2616c4155c12299fa1e4ec0bcfd7aaca0ce70
+  checksum: 10c0/8da802a77a811ccb38aa88b3e130484e61ac77a2807a3d4a054355598c6067c292d5e4cb9866e21d5c52edb92d0dac352cb9b75ed237dad7af4c230e9573ca3f
   languageName: node
   linkType: hard
 
@@ -1668,9 +1668,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^10.8.1":
-  version: 10.8.1
-  resolution: "eslint@npm:10.8.1"
+"eslint@npm:^10.9.1":
+  version: 10.9.1
+  resolution: "eslint@npm:10.9.1"
   dependencies:
     "@eslint-community/eslint-utils": "npm:^4.8.0"
     "@eslint-community/regexpp": "npm:^4.12.2"
@@ -1709,7 +1709,7 @@ __metadata:
       optional: true
   bin:
     eslint: bin/eslint.js
-  checksum: 10c0/0c4720a43ef2052829db18e37aa79adb5f0a62137bdf4a4f8e9507bbbbf888ba0669fc03e4b7139d8f27b59b051bbbcd0a3988b068c30fa934a766d60a81f599
+  checksum: 10c0/11cfd118dced911d506dc752086a641b45c95996af1f7b2a1914f992bbcdca78bb56cd4dd281595c7a792e1562a49047aa65ce763e3ed809cbde84fe4a08924f
   languageName: node
   linkType: hard
 
@@ -1806,9 +1806,9 @@ __metadata:
   linkType: hard
 
 "fast-uri@npm:^3.0.1":
-  version: 3.1.5
-  resolution: "fast-uri@npm:3.1.5"
-  checksum: 10c0/2bf60eb800dd610c65e17be436425dcb21c92aff3a87d442a8bccab0b7b071e88cf1a5d7d1ea946370b937e6fc0375c405c0296c10587e57de4f78be4646d1d0
+  version: 3.1.6
+  resolution: "fast-uri@npm:3.1.6"
+  checksum: 10c0/77fa4f966f7d2cf83c34af2d3eb88882872fe90634f27a6bd309551db65377d3ca55616467c7cb4dcc57e33523d149e2fec1952d51cc2f00bfce68a66c3711ea
   languageName: node
   linkType: hard
 
@@ -2715,11 +2715,11 @@ __metadata:
 
 "juggler-v4@file:./deps/juggler-v4::locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A.":
   version: 4.0.0
-  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=dac34a&locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A."
+  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=cde869&locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A."
   dependencies:
     loopback-datasource-juggler: "npm:4.x"
     should: "npm:^13.2.3"
-  checksum: 10c0/7fe718a40682c75d42e7a38443a55e15c510b1da13b19e36a46aec373709716b12556e457f6631d596adf3890068268a23bb6892b1dec4cbeaf351d4415e263f
+  checksum: 10c0/38eda630e7600154df67a71afaee21aab2c3ef8025fed7e127b8248cec7d4b4ac817cec10a99edc3615176059ce8676e1b3eb4ba4525bcea65180056088219ee
   languageName: node
   linkType: hard
 
@@ -3107,9 +3107,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"mongodb@npm:^7.5.0":
-  version: 7.5.0
-  resolution: "mongodb@npm:7.5.0"
+"mongodb@npm:^7.6.0":
+  version: 7.6.0
+  resolution: "mongodb@npm:7.6.0"
   dependencies:
     "@mongodb-js/saslprep": "npm:^1.4.11"
     bson: "npm:^7.2.0"
@@ -3137,7 +3137,7 @@ __metadata:
       optional: true
     socks:
       optional: true
-  checksum: 10c0/468db2b24fa3e497d6212bc3073c008b46ebffdace1197be5982c976d61e962e85727ac4443c6c8b59a9baed10d14ed589b6ea9234e87727469d7a19e82f9cd0
+  checksum: 10c0/91f45d49aaa17af40b1dbd4f5eff85fd11f12c7df993cadbe51e96c31f40c74596b2d979f7eeebb376889a1397deb9081db10cbb0e8904853c80b1f2fcddf7d0
   languageName: node
   linkType: hard
 
