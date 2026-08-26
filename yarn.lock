@@ -476,7 +476,7 @@ __metadata:
     juggler-v4: "file:./deps/juggler-v4"
     juggler-v5: "file:./deps/juggler-v5"
     loopback-connector: "npm:5.3.3"
-    loopback-datasource-juggler: "npm:@perkd/loopback-datasource-juggler@^6.1.0"
+    loopback-datasource-juggler: "npm:@perkd/loopback-datasource-juggler@^6.1.1"
     mocha: "npm:^11.8.0"
     mongodb: "npm:^7.5.0"
     rc: "npm:^1.2.8"
@@ -2715,11 +2715,11 @@ __metadata:
 
 "juggler-v4@file:./deps/juggler-v4::locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A.":
   version: 4.0.0
-  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=cde869&locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A."
+  resolution: "juggler-v4@file:./deps/juggler-v4#./deps/juggler-v4::hash=dac34a&locator=%40perkd%2Floopback-connector-mongodb%40workspace%3A."
   dependencies:
     loopback-datasource-juggler: "npm:4.x"
     should: "npm:^13.2.3"
-  checksum: 10c0/38eda630e7600154df67a71afaee21aab2c3ef8025fed7e127b8248cec7d4b4ac817cec10a99edc3615176059ce8676e1b3eb4ba4525bcea65180056088219ee
+  checksum: 10c0/7fe718a40682c75d42e7a38443a55e15c510b1da13b19e36a46aec373709716b12556e457f6631d596adf3890068268a23bb6892b1dec4cbeaf351d4415e263f
   languageName: node
   linkType: hard
 
@@ -2873,7 +2873,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loopback-connector@npm:^8.0.0":
+"loopback-connector@npm:^8.0.2":
   version: 8.0.2
   resolution: "loopback-connector@npm:8.0.2"
   dependencies:
@@ -2929,23 +2929,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"loopback-datasource-juggler@npm:@perkd/loopback-datasource-juggler@^6.1.0":
-  version: 6.1.0
-  resolution: "@perkd/loopback-datasource-juggler@npm:6.1.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Floopback-datasource-juggler%2F6.1.0%2Fd3b5a2bf0b752f30a2452fdc638793dfb8f139e7"
+"loopback-datasource-juggler@npm:@perkd/loopback-datasource-juggler@^6.1.1":
+  version: 6.1.1
+  resolution: "@perkd/loopback-datasource-juggler@npm:6.1.1::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40perkd%2Floopback-datasource-juggler%2F6.1.1%2F76e7f0c99f1fc78da55c92e0a5352b39668eaa92"
   dependencies:
     async: "npm:^3.2.6"
     change-case: "npm:5.4.4"
     debug: "npm:^4.4.3"
     depd: "npm:^2.0.0"
     inflection: "npm:^3.0.2"
-    loopback-connector: "npm:^8.0.0"
-    minimatch: "npm:^10.2.5"
-    nanoid: "npm:3.3.12"
+    loopback-connector: "npm:^8.0.2"
+    minimatch: "npm:^10.2.6"
+    nanoid: "npm:^6.0.1"
     neotraverse: "npm:^1.0.1"
     qs: "npm:^6.15.3"
     strong-globalize: "npm:^6.0.6"
     uuid: "npm:11.1.0"
-  checksum: 10c0/28390885041e585a347fd1c6b12d62afbb7bd17cbd9be9e76875362b54f3d4b7f21c9169e2419df3fd5592946cf669553e340f8700bb035cbc39a97ebc0bdb0a
+  checksum: 10c0/313dfd456995a0d831dc33f0fb4fca4bf85c87405e8d54082b24e59ed909749aaf257c92fb01de3f4c645cd772f7edfb7f01260466ae0e52606276987f4d3f69
   languageName: node
   linkType: hard
 

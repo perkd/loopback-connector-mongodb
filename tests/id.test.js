@@ -442,8 +442,8 @@ describe('strictObjectIDCoercion', function() {
     it('should throw if id is not a ObjectID-like string', async function() {
       await assert.rejects(
         User.create({id: 'abc', name: 'John'}),
-        // Rejected either by juggler's ObjectId validation or, if that is
-        // bypassed, by the connector's own coercion check.
+        // Explicit mongodb.dataType ObjectID is rejected by juggler first;
+        // the connector message remains if that validation is disabled.
         (e) => {
           assert.match(String(e.message), /not an ObjectID string|is not a valid ObjectId/);
           return true;
